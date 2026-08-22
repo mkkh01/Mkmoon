@@ -41,7 +41,7 @@ python -m app.worker
 
 ## قاعدة البيانات
 
-تمت إضافة migration `0001_trading_core.sql` إلى مشروع Supabase المحدد، ثم تطبيق `0002_security_hardening.sql`. الجداول الداخلية مفعّل عليها RLS ولا توجد لها سياسات عامة، كما تم سحب صلاحية `anon` و`authenticated` من دالة `public.rls_auto_enable()` ومن الجداول الداخلية. خدمة Render تتصل عبر رابط PostgreSQL الخاص.
+تمت إضافة migrations `0001_trading_core.sql` و`0002_security_hardening.sql` و`0003_revoke_public_function.sql` و`0004_execution_audit_entities.sql` إلى مشروع Supabase المحدد وتطبيقها. الجداول الداخلية مفعّل عليها RLS ولا توجد لها سياسات عامة، كما تم سحب صلاحية `PUBLIC` من دالة `public.rls_auto_enable()` ومن الجداول الداخلية. خدمة Render تتصل عبر رابط PostgreSQL الخاص.
 
 ## قواعد الأمان
 
