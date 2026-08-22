@@ -1,0 +1,66 @@
+services:
+  - type: web
+    name: mkmoon-api
+    runtime: python
+    buildCommand: pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: TRADING_MODE
+        value: paper
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_API_SECRET
+        sync: false
+      - key: SYMBOLS
+        value: BTCUSDT,ETHUSDT,SOLUSDT
+      - key: BINANCE_BASE_URL
+        value: https://api.binance.com
+      - key: BINANCE_DATA_BASE_URL
+        value: https://data-api.binance.vision
+      - key: RISK_PCT
+        value: "0.0025"
+      - key: MAX_DAILY_RISK_PCT
+        value: "0.01"
+      - key: MAX_PORTFOLIO_RISK_PCT
+        value: "0.01"
+  - type: worker
+    name: mkmoon-worker
+    runtime: python
+    buildCommand: pip install .
+    startCommand: python -m app.worker
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: TRADING_MODE
+        value: paper
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_API_SECRET
+        sync: false
+      - key: SYMBOLS
+        value: BTCUSDT,ETHUSDT,SOLUSDT
+      - key: BINANCE_BASE_URL
+        value: https://api.binance.com
+      - key: BINANCE_DATA_BASE_URL
+        value: https://data-api.binance.vision
+      - key: RISK_PCT
+        value: "0.0025"
+      - key: MAX_DAILY_RISK_PCT
+        value: "0.01"
+      - key: MAX_PORTFOLIO_RISK_PCT
+        value: "0.01"

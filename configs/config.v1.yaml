@@ -1,0 +1,32 @@
+version: config.v1
+code_version: mkmoon.v1
+feature_version: features.v1
+risk:
+  fee_rate: "0.001"
+  slippage_rate: "0.0005"
+  min_effective_rr: "1.5"
+decision:
+  min_quality_score: "70"
+edge:
+  mode: disabled_until_calibrated
+  minimum_sample: 100
+  minimum_ev_r: "0.10"
+regime:
+  min_efficiency_trend: "0.35"
+  strong_efficiency: "0.60"
+  trend_slope_pct: "0.05"
+  low_vol_percentile: "20"
+  high_vol_percentile: "80"
+  min_relative_volume: "0.70"
+  max_relative_volume: "3.00"
+score_weights:
+  regime: "15"
+  mtf: "15"
+  structure: "15"
+  liquidity: "10"
+  zone: "10"
+  volume: "10"
+  momentum: "5"
+  volatility: "5"
+  timing: "10"
+  setup_quality: "5"
