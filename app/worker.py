@@ -55,7 +55,7 @@ async def run_once() -> None:
                 log.warning("skip %s: symbol unavailable or not trading", symbol)
                 continue
             candles_by_tf = {
-                tf: await client.closed_klines(symbol, tf, limit)
+                tf: await client.closed_klines(symbol, tf, limit, decision_time_ms=server_time)
                 for tf, limit in TIMEFRAMES.items()
             }
             decision = evaluate_decision(

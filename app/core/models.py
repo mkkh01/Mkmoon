@@ -54,7 +54,7 @@ class FeatureSnapshot(BaseModel):
     feature_version: str = "features.v1"
     values: dict[str, Decimal | None]
     valid: bool = True
-    invalid_reasons: list[str] = []
+    invalid_reasons: list[str] = Field(default_factory=list)
 
 
 class RegimeVector(BaseModel):
@@ -81,7 +81,7 @@ class RiskPlan(BaseModel):
     expected_cost_cash: Decimal = Field(ge=0)
     effective_rr: Decimal = Field(ge=0)
     valid: bool
-    reason_codes: list[str] = []
+    reason_codes: list[str] = Field(default_factory=list)
 
 
 class Decision(BaseModel):
@@ -92,20 +92,20 @@ class Decision(BaseModel):
     decision_time_ms: int
     data_cutoff_ms: int
     status: DecisionStatus
-    reason_codes: list[str] = []
-    invalidation_codes: list[str] = []
+    reason_codes: list[str] = Field(default_factory=list)
+    invalidation_codes: list[str] = Field(default_factory=list)
     regime: RegimeVector | None = None
     setup: SetupType | None = None
     entry_price: Decimal | None = None
     stop_price: Decimal | None = None
     target_price: Decimal | None = None
     quality_score: Decimal | None = None
-    component_scores: dict[str, Decimal] = {}
+    component_scores: dict[str, Decimal] = Field(default_factory=dict)
     risk: RiskPlan | None = None
     ev_status: str = "INSUFFICIENT_DATA"
     ev_r: Decimal | None = None
     ev_sample_size: int = 0
-    lineage: dict[str, str] = {}
+    lineage: dict[str, str] = Field(default_factory=dict)
     decision_hash: str | None = None
     created_at: datetime
 

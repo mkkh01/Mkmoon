@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from decimal import Decimal
 from typing import Any
@@ -44,7 +45,8 @@ class BinancePublicClient:
         return int(payload["serverTime"])
 
     async def exchange_info(self, symbols: list[str]) -> dict[str, ExchangeSymbolFilters]:
-        payload = await self._get(f"{self.base_url}/api/v3/exchangeInfo", {"symbols": str(symbols).replace("'", '"')})
+        symbols_json = json.dumps(symbols, separators=(",", ":"))
+        payload = await self._get(f"{self.base_url}/api/v3/exchangeInfo", {"symbols": symbols_json})
         snapshot_time = int(time.time() * 1000)
         result: dict[str, ExchangeSymbolFilters] = {}
         for item in payload.get("symbols", []):
