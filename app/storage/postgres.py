@@ -14,7 +14,8 @@ class PostgresStore:
         self.pool: asyncpg.Pool | None = None
 
     async def connect(self) -> None:
-        self.pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5, command_timeout=10)
+        use_tls = "supabase" in self.database_url.lower()
+        self.pool = await asyncpg.create_pool(self.database_url, ssl=True if use_tls else None, min_size=1, max_size=5, command_timeout=10)
 
     async def close(self) -> None:
         if self.pool:
