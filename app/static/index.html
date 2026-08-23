@@ -3,402 +3,227 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#09111f" />
-  <title>Mkmoon | لوحة التحكم</title>
+  <meta name="theme-color" content="#08111f" />
+  <title>Mkmoon | غرفة تشغيل Paper</title>
   <style>
     :root {
-      --bg: #08111f;
-      --panel: #101d30;
-      --panel-2: #13243a;
-      --line: rgba(159, 181, 211, .15);
-      --text: #e8f0fb;
-      --muted: #91a4bd;
+      --bg: #07111e;
+      --panel: #0e1b2c;
+      --panel-strong: #13263a;
+      --panel-soft: rgba(17, 36, 56, .72);
+      --line: rgba(167, 193, 220, .14);
+      --text: #eef5fc;
+      --muted: #91a6bd;
       --cyan: #59d7d0;
-      --blue: #6da7ff;
-      --green: #4ade80;
-      --amber: #f5bf67;
-      --red: #f47f86;
-      --shadow: 0 18px 55px rgba(0, 0, 0, .2);
+      --green: #46df9a;
+      --amber: #f6bd69;
+      --red: #f47f8b;
+      --blue: #80aefe;
+      --shadow: 0 15px 45px rgba(0, 0, 0, .22);
+      --radius: 18px;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 86% -10%, rgba(57, 119, 166, .24), transparent 34%),
-        radial-gradient(circle at -10% 30%, rgba(30, 92, 107, .16), transparent 28%),
-        var(--bg);
-      font-family: Tahoma, Arial, sans-serif;
-    }
+    body { margin: 0; min-height: 100vh; color: var(--text); background: radial-gradient(circle at 84% -12%, rgba(46, 107, 145, .28), transparent 35%), var(--bg); font-family: Tahoma, Arial, sans-serif; }
     button, input, select { font: inherit; }
     button { cursor: pointer; }
-    .shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; direction: ltr; }
-    aside { direction: rtl; border-left: 1px solid var(--line); background: rgba(7, 17, 31, .78); padding: 28px 18px; position: sticky; top: 0; height: 100vh; }
-    main { direction: rtl; min-width: 0; padding: 30px clamp(18px, 4vw, 52px) 48px; }
-    .brand { display: flex; gap: 12px; align-items: center; margin: 0 8px 42px; }
-    .brand-mark { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-weight: 900; color: #07121d; background: linear-gradient(145deg, var(--cyan), #7af0bd); box-shadow: 0 10px 24px rgba(89, 215, 208, .22); }
-    .brand h1 { margin: 0; font-size: 18px; letter-spacing: .5px; }
-    .brand p { color: var(--muted); margin: 4px 0 0; font-size: 11px; }
-    .nav { display: grid; gap: 8px; }
-    .nav button { color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 12px; text-align: right; padding: 12px 14px; transition: .18s ease; }
-    .nav button:hover, .nav button.active { color: var(--text); background: rgba(89, 215, 208, .09); border-color: rgba(89, 215, 208, .18); }
-    .nav button.active { box-shadow: inset -3px 0 var(--cyan); }
-    .nav-icon { display: inline-block; width: 22px; color: var(--cyan); }
-    .aside-note { border-top: 1px solid var(--line); margin-top: 40px; padding: 18px 8px; color: var(--muted); font-size: 12px; line-height: 1.8; }
-    .aside-note strong { color: var(--green); display: block; font-size: 13px; }
-    .topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 25px; }
-    .eyebrow { color: var(--cyan); font-size: 12px; letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 8px; }
-    .topline h2 { font-size: clamp(24px, 3vw, 34px); margin: 0 0 8px; letter-spacing: -.7px; }
-    .topline p { color: var(--muted); margin: 0; font-size: 13px; }
-    .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); padding: 10px 14px; border-radius: 10px; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
-    .btn:hover { border-color: rgba(89, 215, 208, .55); background: #18304a; }
-    .btn:active { transform: scale(.97); }
-    .live-chip, .mode-chip { display: inline-flex; gap: 7px; align-items: center; border-radius: 999px; padding: 8px 11px; font-size: 12px; font-weight: 700; }
-    .live-chip { color: var(--green); background: rgba(74, 222, 128, .1); border: 1px solid rgba(74, 222, 128, .25); }
-    .mode-chip { color: var(--amber); background: rgba(245, 191, 103, .11); border: 1px solid rgba(245, 191, 103, .24); }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 15%, transparent); }
-    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 13px; margin-bottom: 22px; }
-    .metric, .panel { background: linear-gradient(145deg, rgba(19, 36, 58, .96), rgba(13, 26, 44, .96)); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 16px; }
-    .metric { padding: 17px; min-height: 104px; }
-    .metric-label { color: var(--muted); font-size: 12px; margin-bottom: 13px; }
-    .metric-value { font-size: 23px; font-weight: 700; }
-    .metric-sub { color: var(--muted); font-size: 11px; margin-top: 7px; }
-    .metric.ok .metric-value { color: var(--green); }
-    .metric.warn .metric-value { color: var(--amber); }
-    .metric.info .metric-value { color: var(--cyan); }
-    .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, .8fr); gap: 18px; }
-    .panel { padding: 20px; margin-bottom: 18px; overflow: hidden; }
-    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-    .panel-title { margin: 0; font-size: 16px; }
-    .panel-desc { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
-    .panel-meta { color: var(--muted); font-size: 11px; white-space: nowrap; }
-    .table-wrap { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; min-width: 580px; }
-    th { color: var(--muted); font-size: 11px; font-weight: 600; text-align: right; padding: 10px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-    td { padding: 12px 9px; font-size: 12px; border-bottom: 1px solid rgba(159, 181, 211, .09); white-space: nowrap; }
-    tbody tr:hover { background: rgba(89, 215, 208, .045); }
-    .symbol { font-weight: 700; letter-spacing: .4px; }
-    .subtle { color: var(--muted); }
+    .app { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 18px 0 40px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 0 22px; }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .brand-mark { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 14px; color: #06121c; font-weight: 900; background: linear-gradient(145deg, var(--cyan), #83f2bb); box-shadow: 0 10px 24px rgba(89, 215, 208, .18); }
+    .brand h1 { margin: 0; font-size: 18px; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .top-actions, .chips, .tabs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 8px 11px; color: var(--muted); background: rgba(14, 27, 44, .7); font-size: 11px; white-space: nowrap; }
+    .chip.safe { color: var(--green); border-color: rgba(70, 223, 154, .3); background: rgba(70, 223, 154, .08); }
+    .chip.warn { color: var(--amber); border-color: rgba(246, 189, 105, .3); background: rgba(246, 189, 105, .08); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent); }
+    .btn { color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--panel-strong); transition: .18s ease; }
+    .btn:hover { border-color: rgba(89, 215, 208, .55); transform: translateY(-1px); }
+    .btn.subtle { color: var(--muted); background: transparent; }
+    .hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 16px; margin-bottom: 16px; }
+    .hero-main, .hero-market, .card { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(145deg, rgba(19, 38, 58, .98), rgba(11, 25, 42, .98)); box-shadow: var(--shadow); }
+    .hero-main { padding: 24px; }
+    .eyebrow { color: var(--cyan); font-size: 11px; letter-spacing: 1.2px; margin-bottom: 9px; }
+    h2, h3, p { margin-top: 0; }
+    h2 { margin-bottom: 9px; font-size: clamp(25px, 4vw, 38px); letter-spacing: -.8px; }
+    .hero-main p { max-width: 650px; color: var(--muted); line-height: 1.75; font-size: 13px; margin-bottom: 17px; }
+    .hero-market { padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 164px; }
+    .hero-market .label { color: var(--muted); font-size: 10px; letter-spacing: 1.2px; }
+    .hero-price { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 13px 0; }
+    .hero-symbol { font-size: 24px; font-weight: 800; }
+    .hero-value { font-size: 23px; font-weight: 700; }
+    .hero-sub { color: var(--muted); font-size: 11px; }
+    .tabs { margin: 0 0 16px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8, 19, 33, .8); overflow-x: auto; }
+    .tab { min-width: max-content; padding: 10px 15px; border: 0; border-radius: 10px; color: var(--muted); background: transparent; font-size: 12px; }
+    .tab.active { color: var(--text); background: var(--panel-strong); box-shadow: inset 0 -2px var(--cyan); }
+    .view { display: none; }
+    .view.active { display: block; }
+    .status-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat { min-height: 90px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-soft); }
+    .stat-label { color: var(--muted); font-size: 10px; margin-bottom: 11px; }
+    .stat-value { font-size: 20px; font-weight: 800; }
+    .stat-value.green { color: var(--green); }
+    .stat-value.cyan { color: var(--cyan); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.red { color: var(--red); }
+    .stat-sub { color: var(--muted); margin-top: 6px; font-size: 10px; line-height: 1.5; word-break: break-word; }
+    .card { padding: 19px; margin-bottom: 16px; }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 15px; }
+    .card-title { margin: 0; font-size: 17px; }
+    .card-desc { margin: 6px 0 0; color: var(--muted); line-height: 1.65; font-size: 11px; }
+    .meta { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .notice { padding: 12px 14px; margin-bottom: 14px; border-right: 3px solid var(--cyan); border-radius: 8px; color: var(--muted); background: rgba(89, 215, 208, .06); font-size: 11px; line-height: 1.75; }
+    .notice strong { color: var(--text); }
+    .cycle-top { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-bottom: 15px; }
+    .cycle-kpi { padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(5, 15, 27, .35); }
+    .cycle-kpi span { display: block; color: var(--muted); font-size: 10px; }
+    .cycle-kpi strong { display: block; margin-top: 7px; font-size: 18px; }
+    .strategy-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 17px; }
+    .strategy-summary-card { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(89, 215, 208, .045); }
+    .strategy-summary-card strong { display: block; font-size: 13px; }
+    .strategy-summary-card span { display: block; color: var(--muted); font-size: 10px; margin-top: 6px; }
+    .progress { height: 6px; overflow: hidden; border-radius: 99px; background: rgba(145, 166, 189, .14); }
+    .progress > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--green)); }
+    .symbol-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+    .symbol-card { border: 1px solid var(--line); border-radius: 14px; background: rgba(8, 19, 33, .7); overflow: hidden; }
+    .symbol-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 13px 10px; }
+    .symbol-name { font-weight: 800; letter-spacing: .5px; }
+    .symbol-name small { color: var(--muted); font-size: 9px; font-weight: 400; }
+    .symbol-card-body { padding: 0 13px 13px; }
+    .symbol-line { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; padding: 4px 0; }
+    .symbol-line b { color: var(--text); font-weight: 600; text-align: left; }
+    .badge { display: inline-flex; align-items: center; border-radius: 7px; padding: 5px 7px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+    .badge-green { color: var(--green); background: rgba(70, 223, 154, .11); }
+    .badge-amber { color: var(--amber); background: rgba(246, 189, 105, .11); }
+    .badge-red { color: var(--red); background: rgba(244, 127, 139, .11); }
+    .badge-blue { color: var(--blue); background: rgba(128, 174, 254, .11); }
+    .strategy-list { border-top: 1px solid var(--line); margin-top: 8px; }
+    details.strategy { border-bottom: 1px solid rgba(167, 193, 220, .09); padding: 7px 0; }
+    details.strategy:last-child { border-bottom: 0; }
+    details.strategy summary { display: flex; align-items: center; justify-content: space-between; gap: 7px; cursor: pointer; list-style: none; font-size: 10px; }
+    details.strategy summary::-webkit-details-marker { display: none; }
+    .strategy-title { color: var(--text); font-weight: 700; }
+    .strategy-count { color: var(--cyan); direction: ltr; unicode-bidi: plaintext; white-space: nowrap; }
+    .condition-list { display: grid; gap: 5px; margin-top: 8px; }
+    .condition { display: flex; align-items: flex-start; gap: 6px; padding: 5px 6px; border-radius: 6px; color: var(--muted); background: rgba(145, 166, 189, .06); font-size: 9px; line-height: 1.45; }
+    .condition.pass { color: #bcefd4; background: rgba(70, 223, 154, .07); }
+    .condition.fail { color: #f3c8cb; background: rgba(244, 127, 139, .06); }
+    .condition .mark { width: 15px; flex: 0 0 15px; color: var(--green); font-weight: 900; text-align: center; }
+    .condition.fail .mark { color: var(--red); }
+    .condition small { display: block; color: var(--muted); font-size: 8px; margin-top: 2px; }
+    .score-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .score-pill { padding: 4px 6px; border-radius: 6px; color: var(--blue); background: rgba(128, 174, 254, .08); font-size: 9px; direction: ltr; }
+    .market-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .market-item { padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(8, 19, 33, .68); }
+    .market-item-head { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }
+    .market-price { margin: 8px 0 4px; font-size: 14px; font-weight: 700; direction: ltr; text-align: right; }
+    .market-sub { color: var(--muted); font-size: 9px; direction: ltr; text-align: right; }
     .positive { color: var(--green); }
     .negative { color: var(--red); }
     .neutral { color: var(--amber); }
-    .badge { border-radius: 7px; padding: 5px 8px; font-size: 10px; font-weight: 700; display: inline-block; }
-    .badge-green { color: var(--green); background: rgba(74, 222, 128, .1); }
-    .badge-red { color: var(--red); background: rgba(244, 127, 134, .1); }
-    .badge-amber { color: var(--amber); background: rgba(245, 191, 103, .1); }
-    .badge-blue { color: var(--blue); background: rgba(109, 167, 255, .1); }
-    .empty, .error-box { color: var(--muted); text-align: center; padding: 34px 14px; font-size: 13px; }
-    .error-box { color: var(--red); }
-    .toolbar { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-    .field { color: var(--text); background: #0b1728; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; outline: none; min-width: 185px; }
-    .field:focus { border-color: rgba(89, 215, 208, .7); box-shadow: 0 0 0 3px rgba(89, 215, 208, .08); }
-    .field::placeholder { color: #6f829d; }
-    .switches { display: flex; gap: 6px; }
-    .switch { color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; font-size: 11px; }
-    .switch.active { color: var(--cyan); border-color: rgba(89, 215, 208, .5); background: rgba(89, 215, 208, .08); }
-    .view { display: none; }
-    .view.active { display: block; }
-    .feed-note { border-right: 3px solid var(--cyan); background: rgba(89, 215, 208, .055); color: var(--muted); padding: 12px 13px; font-size: 12px; line-height: 1.7; margin-bottom: 17px; }
-    .feed-note strong { color: var(--text); }
-    .timestamp { direction: ltr; unicode-bidi: plaintext; }
-    .log-level { font-size: 10px; font-weight: 700; }
-    .loading { opacity: .55; }
-    .cycle-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
-    .cycle-stat { border: 1px solid var(--line); border-radius: 11px; padding: 12px; background: rgba(7, 17, 31, .35); }
-    .cycle-stat strong { display: block; font-size: 17px; margin-top: 5px; }
-    .cycle-stat span { color: var(--muted); font-size: 11px; }
-    .cycle-ok { color: var(--green); }
-    .cycle-warn { color: var(--amber); }
-    .cycle-error { color: var(--red); }
-    .mono { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-    .cycle-detail { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
-    @media (max-width: 760px) { .cycle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    .footer { color: #6f829d; text-align: center; font-size: 11px; margin-top: 27px; }
-    @media (max-width: 1120px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .grid { grid-template-columns: 1fr; } }
-    @media (max-width: 760px) { .shell { display: block; } aside { position: static; height: auto; padding: 18px; border-left: 0; border-bottom: 1px solid var(--line); } .brand { margin-bottom: 20px; } .nav { display: flex; overflow-x: auto; padding-bottom: 2px; } .nav button { min-width: max-content; } .aside-note { display: none; } main { padding: 22px 14px 35px; } .topline { display: block; } .actions { margin-top: 16px; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric { min-height: 92px; } .metric-value { font-size: 20px; } .panel { padding: 15px; } }
-    @media (max-width: 430px) { .metrics { grid-template-columns: 1fr 1fr; gap: 8px; } .metric { padding: 13px; } .metric-label { font-size: 10px; } .metric-value { font-size: 18px; } .live-chip, .mode-chip { font-size: 10px; } }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 13px; }
+    .field { min-width: 210px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; outline: none; color: var(--text); background: #091728; font-size: 11px; }
+    .field:focus { border-color: rgba(89, 215, 208, .65); }
+    .list { display: grid; gap: 8px; }
+    .list-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 11px 12px; border: 1px solid rgba(167, 193, 220, .1); border-radius: 10px; background: rgba(8, 19, 33, .52); font-size: 10px; }
+    .list-row strong { display: block; margin-bottom: 4px; }
+    .list-row small { color: var(--muted); }
+    .empty, .error { padding: 28px 12px; color: var(--muted); text-align: center; font-size: 12px; }
+    .error { color: var(--red); }
+    .explain { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .step { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(8, 19, 33, .5); }
+    .step b { display: block; color: var(--cyan); margin-bottom: 6px; font-size: 11px; }
+    .step span { color: var(--muted); line-height: 1.55; font-size: 10px; }
+    .footer { color: #6e839e; text-align: center; font-size: 10px; margin-top: 22px; }
+    .ltr { direction: ltr; unicode-bidi: plaintext; }
+    @media (max-width: 980px) { .status-grid { grid-template-columns: repeat(3, 1fr); } .symbol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .market-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .explain { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px) { .app { width: min(100% - 20px, 560px); padding-top: 9px; } .topbar, .card-head { display: block; } .top-actions { margin-top: 13px; } .hero { grid-template-columns: 1fr; } .hero-main { padding: 19px; } .hero-market { min-height: 140px; } .status-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } .stat { min-height: 83px; padding: 12px; } .stat-value { font-size: 18px; } .cycle-top { grid-template-columns: repeat(2, 1fr); } .cycle-kpi:last-child { grid-column: 1 / -1; } .strategy-summary { grid-template-columns: repeat(2, 1fr); } .symbol-grid { grid-template-columns: 1fr; } .market-grid { grid-template-columns: repeat(2, 1fr); } .explain { grid-template-columns: 1fr 1fr; } .meta { display: block; margin-top: 7px; white-space: normal; } .field { min-width: 0; width: 100%; } .list-row { grid-template-columns: 1fr auto; } .list-row small { grid-column: 1 / -1; } }
+    @media (max-width: 390px) { .app { width: calc(100% - 14px); } .topbar { padding-bottom: 15px; } .hero-main h2 { font-size: 25px; } .market-grid { gap: 6px; } .market-item { padding: 9px; } .market-price { font-size: 12px; } .explain { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <aside>
-      <div class="brand">
-        <div class="brand-mark">MK</div>
-        <div><h1>Mkmoon</h1><p>Binance Spot Monitor</p></div>
-      </div>
-      <nav class="nav" aria-label="التنقل">
-        <button class="active" data-tab="overview"><span class="nav-icon">◈</span> نظرة عامة</button>
-        <button data-tab="orders"><span class="nav-icon">↔</span> الصفقات الورقية</button>
-        <button data-tab="decisions"><span class="nav-icon">⌁</span> القرارات</button>
-        <button data-tab="logs"><span class="nav-icon">▤</span> سجلات التطبيق</button>
-        <button data-tab="cycles"><span class="nav-icon">◌</span> ملخص الدورات</button>
-      </nav>
-      <div class="aside-note"><strong>وضع آمن مفعل</strong>هذه اللوحة للمتابعة والتحليل. لا يوجد زر يرسل أمرًا إلى Binance، والتنفيذ الحي معطل.</div>
-    </aside>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">MK</div><div><h1>Mkmoon</h1><p>غرفة تشغيل Binance Spot — Paper</p></div></div>
+      <div class="top-actions"><span id="serviceChip" class="chip safe"><span class="dot"></span> الخدمة متصلة</span><span class="chip warn"><span class="dot"></span> Paper فقط</span><button id="refreshBtn" class="btn">تحديث</button></div>
+    </header>
 
-    <main>
-      <div class="topline">
-        <div>
-          <div class="eyebrow">Trading operations / control room</div>
-          <h2>لوحة مراقبة Mkmoon</h2>
-          <p>قرارات Rule-Based لأسواق Binance Spot مع بيانات سوق عامة محدثة.</p>
-        </div>
-        <div class="actions">
-          <span class="live-chip"><span class="dot"></span> الخدمة Live</span>
-          <span class="mode-chip"><span class="dot"></span> Paper فقط</span>
-          <button id="refreshBtn" class="btn">تحديث الآن</button>
-        </div>
-      </div>
+    <section class="hero">
+      <div class="hero-main"><div class="eyebrow">مراقبة وتشخيص النظام</div><h2>ماذا فعل النظام الآن؟</h2><p>تبدأ الدورة بجلب الشموع المغلقة لكل رمز، ثم تفحص أربع استراتيجيات، تحسب الشروط والسكور، وتقرر: متابعة، مرشح، دخول Paper أو عدم تداول. لا يوجد هنا أي إرسال أمر حقيقي إلى Binance.</p><div class="chips"><span class="chip safe">PostgreSQL <b id="heroDb">—</b></span><span class="chip safe">Redis <b id="heroRedis">—</b></span><span class="chip">Worker <b id="heroWorker">—</b></span></div></div>
+      <div class="hero-market"><span class="label">السوق المختار · أسعار العرض العامة</span><div class="hero-price"><span id="heroSymbol" class="hero-symbol">BTCUSDT</span><span id="heroPrice" class="hero-value">—</span></div><div class="hero-sub"><span id="heroChange">—</span> · <span id="marketConnection">جاري الاتصال بالسوق</span></div></div>
+    </section>
 
-      <section class="metrics" aria-label="ملخص التشغيل">
-        <div class="metric ok"><div class="metric-label">حالة الخدمة</div><div id="serviceMetric" class="metric-value">—</div><div id="envMetric" class="metric-sub">جارٍ التحقق</div></div>
-        <div class="metric info"><div class="metric-label">PostgreSQL</div><div id="dbMetric" class="metric-value">—</div><div class="metric-sub">اتصال قاعدة البيانات</div></div>
-        <div class="metric info"><div class="metric-label">Redis</div><div id="redisMetric" class="metric-value">—</div><div class="metric-sub">التنسيق والـ locks</div></div>
-        <div class="metric warn"><div class="metric-label">صفقات مفتوحة</div><div id="openMetric" class="metric-value">0</div><div class="metric-sub">Paper orders</div></div>
-        <div class="metric"><div class="metric-label">صفقات مغلقة</div><div id="closedMetric" class="metric-value">0</div><div class="metric-sub">Paper history</div></div>
-        <div class="metric info"><div class="metric-label">Paper Worker</div><div id="workerMetric" class="metric-value">—</div><div id="workerMetricSub" class="metric-sub">حالة دورة الشموع</div></div>
-      </section>
+    <nav class="tabs" aria-label="أقسام اللوحة"><button class="tab active" data-tab="overview">لوحة التشغيل</button><button class="tab" data-tab="strategies">الرموز والاستراتيجيات</button><button class="tab" data-tab="cycles">ملخص الدورات</button><button class="tab" data-tab="orders">الصفقات الورقية</button><button class="tab" data-tab="logs">السجل</button></nav>
 
-      <div id="overviewView" class="view active">
-        <div id="sourceNote" class="feed-note"><strong>مصدر الأسعار:</strong> أسعار العرض تأتي من Binance WebSocket/REST العام ولا تمثل أوامر تنفيذ. مصدر Worker للتحليل يسجل داخل Cycle Summary؛ إذا ظهر Binance US فهو مصدر بديل رسمي مستقل وليس مطابقًا تلقائيًا لـ Binance.com.</div>
-        <div class="grid">
-          <section class="panel">
-            <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">أسعار لحظية عبر WebSocket؛ التغير والنطاق يظهران عند توفر بيانات REST العامة.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
-            <div class="toolbar"><input id="marketSearch" class="field" type="search" placeholder="ابحث عن زوج مثل BTC أو SOL" aria-label="البحث في السوق" /></div>
-            <div id="marketBox" class="table-wrap"></div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><div><h3 class="panel-title">آخر القرارات</h3><p class="panel-desc">آخر نتائج محرك القواعد من PostgreSQL.</p></div><button class="btn" data-go="decisions">كل القرارات</button></div>
-            <div id="decisionPreview" class="table-wrap"></div>
-          </section>
-        </div>
-      </div>
+    <section id="overviewView" class="view active">
+      <div class="status-grid" aria-label="مؤشرات التشغيل"><div class="stat"><div class="stat-label">حالة الخدمة</div><div id="serviceStat" class="stat-value green">—</div><div id="serviceSub" class="stat-sub">—</div></div><div class="stat"><div class="stat-label">الرموز في الدورة</div><div id="symbolsStat" class="stat-value cyan">—</div><div class="stat-sub">المطلوب / المعالج</div></div><div class="stat"><div class="stat-label">آخر دورة</div><div id="cycleStat" class="stat-value cyan">—</div><div id="cycleSub" class="stat-sub">—</div></div><div class="stat"><div class="stat-label">القرارات</div><div id="decisionStat" class="stat-value">—</div><div class="stat-sub">الإجمالي المحفوظ</div></div><div class="stat"><div class="stat-label">أخطاء آخر دورة</div><div id="errorStat" class="stat-value green">—</div><div class="stat-sub">يجب أن تكون 0</div></div><div class="stat"><div class="stat-label">Paper orders</div><div id="orderStat" class="stat-value amber">—</div><div class="stat-sub">مفتوحة / مغلقة</div></div></div>
+      <div id="sourceNotice" class="notice"><strong>مصدر البيانات:</strong> —</div>
+      <section class="card"><div class="card-head"><div><h3 class="card-title">آخر دورة تشغيل</h3><p class="card-desc">هنا ترى نتيجة الدورة ككل، ثم عدد الرموز والقرارات والأخطاء. افتح تبويب «الرموز والاستراتيجيات» لرؤية كل رمز وشروط كل استراتيجية.</p></div><span id="cycleMeta" class="meta">—</span></div><div id="cycleOverviewBox"><div class="empty">جارٍ تحميل آخر دورة…</div></div></section>
+      <section class="card"><div class="card-head"><div><h3 class="card-title">السوق — 25 زوجًا</h3><p class="card-desc">أسعار العرض اللحظية للمتابعة فقط. لا تدخل في قرار Worker ولا تنشئ أوامر.</p></div><span id="marketUpdated" class="meta">—</span></div><div class="toolbar"><input id="marketSearch" class="field" type="search" placeholder="ابحث عن BTC أو SOL…" /></div><div id="marketBox" class="market-grid"></div></section>
+      <section class="card"><div class="card-head"><div><h3 class="card-title">كيف يعمل النظام؟</h3><p class="card-desc">خمس مراحل بسيطة لفهم أي دورة.</p></div></div><div class="explain"><div class="step"><b>1 · البيانات</b><span>يجلب 4 أطر زمنية من الشموع المغلقة فقط.</span></div><div class="step"><b>2 · regime</b><span>يحدد الاتجاه والتذبذب والبنية والسيولة.</span></div><div class="step"><b>3 · الاستراتيجيات</b><span>يفحص 4 setups، وكل شرط يظهر نجاحه أو نقصه.</span></div><div class="step"><b>4 · القرار</b><span>يجمع الشروط والسكور والمخاطر وEV.</span></div><div class="step"><b>5 · Paper</b><span>لا ينفذ إلا Paper؛ التداول الحي مغلق.</span></div></div></section>
+    </section>
 
-      <div id="ordersView" class="view">
-        <section class="panel">
-          <div class="panel-head"><div><h3 class="panel-title">الصفقات الورقية</h3><p class="panel-desc">عرض الصفقات المفتوحة والمغلقة والبحث في رقم الأمر أو الرمز أو الحالة.</p></div><span class="panel-meta">لا يوجد تنفيذ حي</span></div>
-          <div class="toolbar"><div class="switches"><button class="switch active" data-order-view="all">الكل</button><button class="switch" data-order-view="open">مفتوحة</button><button class="switch" data-order-view="closed">مغلقة</button></div><input id="orderSearch" class="field" type="search" placeholder="بحث في الصفقات" aria-label="البحث في الصفقات" /></div>
-          <div id="ordersBox" class="table-wrap"></div>
-        </section>
-      </div>
+    <section id="strategiesView" class="view"><section class="card"><div class="card-head"><div><h3 class="card-title">تشخيص كل رمز واستراتيجية</h3><p class="card-desc">كل بطاقة تمثل رمزًا من الدورة الأخيرة. «7 / 11» تعني أن 7 شروط تحققت من أصل 11، واللون الأحمر يوضح أول شرط ناقص.</p></div><span id="strategyMeta" class="meta">—</span></div><div id="strategySummary" class="strategy-summary"></div><div class="toolbar"><input id="symbolSearch" class="field" type="search" placeholder="ابحث عن رمز مثل BTCUSDT…" /></div><div id="symbolGrid" class="symbol-grid"><div class="empty">جارٍ تحميل تشخيص الرموز…</div></div></section></section>
 
-      <div id="decisionsView" class="view">
-        <section class="panel">
-          <div class="panel-head"><div><h3 class="panel-title">سجل القرارات</h3><p class="panel-desc">كل قرار يتضمن الحالة، الرمز، وقت البيانات، وملخصًا من payload.</p></div><span id="decisionCount" class="panel-meta">—</span></div>
-          <div class="toolbar"><input id="decisionSearch" class="field" type="search" placeholder="بحث بالرمز أو الحالة" aria-label="البحث في القرارات" /></div>
-          <div id="decisionsBox" class="table-wrap"></div>
-        </section>
-      </div>
+    <section id="cyclesView" class="view"><section class="card"><div class="card-head"><div><h3 class="card-title">ملخص الدورات والتدقيق</h3><p class="card-desc">كل دورة تعرض عدد الرموز والقرارات والأخطاء. افتح أي دورة لرؤية timeline من جلب البيانات إلى القرار والتخزين وPaper.</p></div><span class="meta">آخر 200 دورة</span></div><div class="toolbar"><input id="cycleSearch" class="field" type="search" placeholder="ابحث برقم الدورة أو الحالة…" /></div><div id="cyclesBox" class="list"><div class="empty">جارٍ تحميل الدورات…</div></div><div id="cycleDetailBox" style="margin-top:16px"></div></section></section>\n\n    <section id="ordersView" class="view"><section class="card"><div class="card-head"><div><h3 class="card-title">الصفقات الورقية</h3><p class="card-desc">أي order هنا محاكاة محفوظة فقط. عدم وجود orders حاليًا يعني أنه لم يصدر قرار ENTER.</p></div><span class="meta">لا تداول حي</span></div><div class="toolbar"><div class="chips"><button class="btn order-filter active" data-order-view="all">الكل</button><button class="btn order-filter" data-order-view="open">مفتوحة</button><button class="btn order-filter" data-order-view="closed">مغلقة</button></div><input id="orderSearch" class="field" type="search" placeholder="ابحث في الأوامر…" /></div><div id="ordersBox" class="list"></div></section></section>
 
-      <div id="cyclesView" class="view">
-        <section class="panel">
-          <div class="panel-head"><div><h3 class="panel-title">Cycle Summary — سجل دورة النظام</h3><p class="panel-desc">تسلسل قابل للتدقيق من بداية الدورة حتى القرار والتخزين وPaper execution، مع أسباب الإيقاف والأخطاء ومدد المراحل.</p></div><span class="panel-meta">آخر 200 دورة</span></div>
-          <div class="feed-note"><strong>كيف نقرأ الدورة؟</strong> كل صف دورة يلخص عدد الرموز والقرارات والأخطاء. افتح التفاصيل لرؤية timeline لكل رمز: التحقق، جلب الشموع المغلقة، بوابة Features، القرار، PostgreSQL، Redis، ثم سبب تخطي أو حظر Paper execution.</div>
-          <div class="toolbar"><input id="cycleSearch" class="field" type="search" placeholder="بحث برقم الدورة أو الحالة أو الوضع" aria-label="البحث في دورات التشغيل" /></div>
-          <div id="cyclesBox" class="table-wrap"></div>
-          <div id="cycleDetailBox" class="cycle-detail"></div>
-        </section>
-      </div>
+    <section id="logsView" class="view"><section class="card"><div class="card-head"><div><h3 class="card-title">السجل والقرارات الأخيرة</h3><p class="card-desc">استخدم البحث لمعرفة لماذا أصبح الرمز WATCH أو NO TRADE أو ENTER.</p></div><span id="decisionCount" class="meta">—</span></div><div class="toolbar"><input id="decisionSearch" class="field" type="search" placeholder="بحث في القرارات…" /><input id="logSearch" class="field" type="search" placeholder="بحث في السجل…" /></div><h3 class="card-title" style="font-size:13px;margin:17px 0 9px">آخر القرارات</h3><div id="decisionsBox" class="list"></div><h3 class="card-title" style="font-size:13px;margin:22px 0 9px">سجل التطبيق</h3><div id="logsBox" class="list"></div></section></section>
 
-      <div id="logsView" class="view">
-        <section class="panel">
-          <div class="panel-head"><div><h3 class="panel-title">سجلات التطبيق</h3><p class="panel-desc">سجل التشغيل الذي تجمعه الخدمة، مع فلترة المستوى والبحث النصي. سجلات Render الكاملة تبقى في لوحة Render.</p></div><span class="panel-meta">آخر 400 سجل</span></div>
-          <div class="toolbar"><input id="logSearch" class="field" type="search" placeholder="ابحث في السجل" aria-label="البحث في السجلات" /><select id="logLevel" class="field" aria-label="مستوى السجل"><option value="">كل المستويات</option><option value="INFO">INFO</option><option value="WARNING">WARNING</option><option value="ERROR">ERROR</option></select></div>
-          <div id="logsBox" class="table-wrap"></div>
-        </section>
-      </div>
-      <div class="footer">Mkmoon · Binance public data · Paper-first · آخر فحص: <span id="lastRefresh">—</span></div>
-    </main>
+    <div class="footer">Mkmoon · Binance public data · Paper-first · آخر تحديث: <span id="lastRefresh">—</span></div>
   </div>
 
   <script>
-    const state = { tickers: [], orderView: 'all', summary: null };
-    const DASHBOARD_SYMBOLS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','TRXUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','POLUSDT','LTCUSDT','BCHUSDT','ATOMUSDT','UNIUSDT','ETCUSDT','FILUSDT','NEARUSDT','APTUSDT','OPUSDT','ARBUSDT','SUIUSDT','INJUSDT','XLMUSDT'];
-    const $ = (id) => document.getElementById(id);
-    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
-    const fmtTime = (ms) => ms ? new Date(Number(ms)).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
-    const fmtPrice = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }); };
-    const fmtPct = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
-    const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
-    const cycleStatusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = s === 'COMPLETED' ? 'badge-green' : ['PARTIAL','RUNNING','SKIPPED_LOCKED'].includes(s) ? 'badge-amber' : ['FAILED','FAILED_UNHANDLED'].includes(s) ? 'badge-red' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
-    const stageLabel = { CYCLE_START:'بدء الدورة', POSTGRES_CONNECT:'اتصال PostgreSQL', REDIS_CONNECT:'اتصال Redis', BINANCE_SERVER_TIME:'وقت Binance', EXCHANGE_INFO:'معلومات الأزواج', SYMBOL_VALIDATE:'تحقق الرمز', CANDLE_FETCH:'جلب الشموع المغلقة', FEATURE_GATE:'بوابة البيانات والميزات', DECISION_EVALUATE:'تقييم القرار', CANDLE_PERSIST:'حفظ الشموع', DECISION_PERSIST:'حفظ القرار', PERSISTENCE:'التخزين', REDIS_PUBLISH:'نشر Redis', PAPER_EXECUTION:'Paper execution', CYCLE_UNHANDLED:'خطأ غير معالج' };
-    const fmtDuration = (value) => value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-US')} ms`;
+    const state = { tickers: [], summary: null, cycle: null, orderView: 'all' };
+    const SYMBOLS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','TRXUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','POLUSDT','LTCUSDT','BCHUSDT','ATOMUSDT','UNIUSDT','ETCUSDT','FILUSDT','NEARUSDT','APTUSDT','OPUSDT','ARBUSDT','SUIUSDT','INJUSDT','XLMUSDT'];
+    const STRATEGIES = ['TREND_PULLBACK','BREAKOUT_RETEST','LIQUIDITY_SWEEP_REVERSAL','RANGE_EDGE_REVERSION'];
+    const strategyNames = { TREND_PULLBACK:'ارتداد مع الاتجاه', BREAKOUT_RETEST:'اختراق وإعادة اختبار', LIQUIDITY_SWEEP_REVERSAL:'استرداد بعد كسر سيولة', RANGE_EDGE_REVERSION:'ارتداد من نطاق' };
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    const fmtTime = ms => ms ? new Date(Number(ms)).toLocaleString('ar-EG', { dateStyle:'short', timeStyle:'medium' }) : '—';
+    const fmtPrice = value => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US',{maximumFractionDigits:2}) : n >= 1 ? n.toLocaleString('en-US',{maximumFractionDigits:4}) : n.toLocaleString('en-US',{maximumFractionDigits:8}); };
+    const fmtPct = value => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); return Number.isFinite(n) ? `${n >= 0 ? '+' : ''}${n.toFixed(2)}%` : '—'; };
+    const badge = status => { const s = String(status || '—'); const cls = ['COMPLETED','ENTER','FILLED','READY','VALID','PROCESSED','CLOSED'].includes(s) ? 'badge-green' : ['FAILED','UNSAFE','REJECTED','ERROR'].includes(s) ? 'badge-red' : ['WATCH','CANDIDATE','INCOMPLETE','RUNNING','OPEN','SKIPPED'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
     const tokenFromUrl = new URLSearchParams(location.search).get('dashboard_token');
     if (tokenFromUrl) { localStorage.setItem('mkmoon_dashboard_token', tokenFromUrl); history.replaceState({}, document.title, location.pathname); }
-    async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const token = localStorage.getItem('mkmoon_dashboard_token'); const headers = { 'Accept': 'application/json' }; if (token) headers['Authorization'] = `Bearer ${token}`; const response = await fetch(url, { headers, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
+    async function getJson(url, timeoutMs = 15000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const headers = {'Accept':'application/json'}; const token = localStorage.getItem('mkmoon_dashboard_token'); if (token) headers.Authorization = `Bearer ${token}`; const response = await fetch(url, { headers, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json(); } finally { clearTimeout(timer); } }
 
-    let marketSocket = null;
-    let marketReconnectTimer = null;
-    let marketRotationTimer = null;
-    let marketReconnectAttempt = 0;
-    const MARKET_STREAM_URL = 'wss://stream.binance.com:443/stream?streams=' + DASHBOARD_SYMBOLS.map((symbol) => `${symbol.toLowerCase()}@miniTicker`).join('/');
+    let marketSocket = null, reconnectTimer = null, rotationTimer = null, reconnectAttempt = 0;
+    const MARKET_STREAM_URL = 'wss://stream.binance.com:443/stream?streams=' + SYMBOLS.map(s => `${s.toLowerCase()}@miniTicker`).join('/');
+    function connectMarketSocket() { if (!window.WebSocket || (marketSocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(marketSocket.readyState))) return; clearTimeout(reconnectTimer); const socket = new WebSocket(MARKET_STREAM_URL); marketSocket = socket; setText('marketConnection','الاتصال بالسوق جارٍ'); socket.onopen = () => { reconnectAttempt = 0; setText('marketConnection','WebSocket متصل'); clearTimeout(rotationTimer); rotationTimer = setTimeout(() => socket.close(1000,'scheduled rotation'), 23 * 60 * 60 * 1000); }; socket.onmessage = event => { try { const item = JSON.parse(event.data).data; if (!item || item.e !== '24hrMiniTicker' || !item.s || item.c === undefined) return; const row = { symbol:String(item.s).toUpperCase(), price:item.c, change_percent:null, high:item.h, low:item.l, quote_volume:item.q, updated_at_ms:Number(item.E || Date.now()) }; const i = state.tickers.findIndex(x => x.symbol === row.symbol); if (i < 0) state.tickers.push(row); else state.tickers[i] = {...state.tickers[i], ...row}; setText('marketUpdated', `WebSocket · ${fmtTime(row.updated_at_ms)}`); renderMarket(); renderHeroMarket(); } catch (_) {} }; socket.onerror = () => socket.close(); socket.onclose = () => { if (marketSocket !== socket) return; marketSocket = null; clearTimeout(rotationTimer); setText('marketConnection','إعادة اتصال السوق'); const delay = Math.min(30000, 1000 * 2 ** Math.min(reconnectAttempt++, 5)); reconnectTimer = setTimeout(connectMarketSocket, delay); }; }
+    function renderHeroMarket() { const row = state.tickers.find(x => x.symbol === 'BTCUSDT') || state.tickers[0]; if (!row) return; setText('heroSymbol', row.symbol); setText('heroPrice', fmtPrice(row.price)); const change = row.change_percent === null ? 'بيانات WebSocket عامة' : fmtPct(row.change_percent); setText('heroChange', change); }
+    function renderMarket() { const q = ($('marketSearch')?.value || '').trim().toUpperCase(); const rows = state.tickers.filter(x => !q || x.symbol.includes(q)); if (!rows.length) { $('marketBox').innerHTML = '<div class="empty">لا توجد أسعار مطابقة بعد.</div>'; return; } $('marketBox').innerHTML = rows.map(row => { const change = row.change_percent === null ? '—' : fmtPct(row.change_percent); const cls = Number(row.change_percent) > 0 ? 'positive' : Number(row.change_percent) < 0 ? 'negative' : 'neutral'; return `<div class="market-item"><div class="market-item-head"><strong>${esc(row.symbol.replace('USDT',''))}<small class="meta">/USDT</small></strong><span class="${cls}">${change}</span></div><div class="market-price">${fmtPrice(row.price)}</div><div class="market-sub">24h high ${fmtPrice(row.high)} · low ${fmtPrice(row.low)}</div></div>`; }).join(''); }
+    async function loadBrowserMarket() { const params = encodeURIComponent(JSON.stringify(SYMBOLS)); for (const host of ['https://api.binance.com','https://api1.binance.com','https://api2.binance.com']) { try { const response = await fetch(`${host}/api/v3/ticker/price?symbols=${params}`, {headers:{'Accept':'application/json'}}); if (!response.ok) throw new Error(`HTTP ${response.status}`); const rows = await response.json(); state.tickers = rows.map(x => ({symbol:x.symbol,price:x.price,change_percent:null,high:null,low:null,quote_volume:null,updated_at_ms:Date.now()})); setText('marketUpdated', `Binance REST مباشر · ${fmtTime(Date.now())}`); renderMarket(); renderHeroMarket(); return; } catch (_) {} } throw new Error('browser market fallback failed'); }
+    async function loadMarket() { connectMarketSocket(); if (marketSocket?.readyState === WebSocket.OPEN && state.tickers.length >= SYMBOLS.length) return; try { const data = await getJson('/api/market/tickers', 4500); if (data.data?.length) state.tickers = data.data; if (!marketSocket || marketSocket.readyState !== WebSocket.OPEN) setText('marketUpdated', `REST · ${fmtTime(data.updated_at_ms)}`); renderMarket(); renderHeroMarket(); } catch (_) { try { await loadBrowserMarket(); } catch (_) { if (!state.tickers.length) $('marketBox').innerHTML = '<div class="error">تعذر جلب أسعار السوق العامة مؤقتًا.</div>'; } } }
 
-    function connectMarketSocket() {
-      if (!window.WebSocket || (marketSocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(marketSocket.readyState))) return;
-      clearTimeout(marketReconnectTimer);
-      const socket = new WebSocket(MARKET_STREAM_URL);
-      marketSocket = socket;
-      setText('marketUpdated', 'WebSocket · جارٍ الاتصال');
-      socket.onopen = () => {
-        marketReconnectAttempt = 0;
-        setText('marketUpdated', 'WebSocket · متصل');
-        clearTimeout(marketRotationTimer);
-        marketRotationTimer = setTimeout(() => socket.close(1000, 'scheduled rotation'), 23 * 60 * 60 * 1000);
-      };
-      socket.onmessage = (event) => {
-        try {
-          const packet = JSON.parse(event.data);
-          const item = packet.data || packet;
-          if (item.e !== '24hrMiniTicker' || !item.s || item.c === undefined) return;
-          const normalized = { symbol: String(item.s).toUpperCase(), price: item.c, change_percent: null, high: item.h ?? null, low: item.l ?? null, volume: item.v ?? null, quote_volume: item.q ?? null, updated_at_ms: Number(item.E || Date.now()) };
-          const index = state.tickers.findIndex((ticker) => ticker.symbol === normalized.symbol);
-          if (index === -1) state.tickers.push(normalized); else state.tickers[index] = { ...state.tickers[index], ...normalized };
-          setText('marketUpdated', `WebSocket · ${fmtTime(normalized.updated_at_ms)}`);
-          renderMarket();
-        } catch (error) { /* Ignore malformed public market packets. */ }
-      };
-      socket.onerror = () => socket.close();
-      socket.onclose = () => {
-        if (marketSocket !== socket) return;
-        marketSocket = null;
-        clearTimeout(marketRotationTimer);
-        setText('marketUpdated', 'WebSocket · إعادة الاتصال');
-        const delay = Math.min(30000, 1000 * (2 ** Math.min(marketReconnectAttempt++, 5)));
-        marketReconnectTimer = setTimeout(connectMarketSocket, delay);
-      };
-    }
+    async function loadSummary() { try { const data = await getJson('/api/dashboard/summary'); state.summary = data; const worker = data.paper_worker || {}; const status = data.service === 'online' ? 'Online' : 'خطأ'; setText('serviceStat', status); setText('serviceSub', `${data.environment || '—'} · ${data.trading_mode === 'paper' ? 'Paper' : data.trading_mode}`); setText('heroDb', data.database === 'connected' ? 'متصل' : data.database || '—'); setText('heroRedis', data.redis === 'connected' ? 'متصل' : data.redis || '—'); setText('heroWorker', worker.running ? 'يعمل' : worker.enabled ? 'متوقف' : 'معطل'); setText('symbolsStat', `${data.worker_symbols ?? '—'} / ${data.dashboard_symbols ?? '—'}`); setText('decisionStat', data.recent_decisions ?? '—'); setText('orderStat', `${data.orders?.open ?? 0} / ${data.orders?.closed ?? 0}`); setText('cycleStat', worker.last_cycle_status || '—'); setText('cycleSub', worker.last_cycle_duration_ms ? `${worker.last_cycle_duration_ms} ms · ${fmtTime(worker.last_cycle_finished_at_ms)}` : '—'); setText('errorStat', worker.last_cycle_errors?.length || 0); const source = worker.last_cycle_data_source || data.worker_data_source || 'غير مسجل'; $('sourceNotice').innerHTML = `<strong>مصدر البيانات:</strong> Worker حلّل <b>${esc(data.worker_symbols ?? '—')} من ${esc(data.dashboard_symbols ?? '—')}</b> رمزًا. مصدر التحليل: <span class="ltr">${esc(source)}</span>. WebSocket في هذه الصفحة للعرض فقط، ولا توجد أوامر حية.`; if (data.live_trading_enabled !== false || data.trading_mode !== 'paper') { document.querySelector('.chip.warn').innerHTML = '<span class="dot"></span> تحقق من وضع التشغيل'; } } catch (_) { setText('serviceStat','خطأ'); setText('serviceSub','تعذر قراءة summary'); } }
 
-    function renderMarket() {
-      const query = ($('marketSearch')?.value || '').trim().toUpperCase();
-      const rows = state.tickers.filter((item) => !query || item.symbol.includes(query));
-      if (!rows.length) { $('marketBox').innerHTML = '<div class="empty">لا توجد أسعار مطابقة أو أن Binance لم تُرجع البيانات بعد.</div>'; return; }
-      $('marketBox').innerHTML = `<table><thead><tr><th>الزوج</th><th>السعر</th><th>24 ساعة</th><th>أعلى</th><th>أدنى</th><th>الحجم</th></tr></thead><tbody>${rows.map((item) => { const positive = Number(item.change_percent) >= 0; return `<tr><td class="symbol">${esc(item.symbol.replace('USDT',''))}<span class="subtle">/USDT</span></td><td>${fmtPrice(item.price)}</td><td class="${positive ? 'positive' : 'negative'}">${fmtPct(item.change_percent)}</td><td>${fmtPrice(item.high)}</td><td>${fmtPrice(item.low)}</td><td class="subtle">${fmtPrice(item.quote_volume)} USDT</td></tr>`; }).join('')}</tbody></table>`;
-    }
+    function conditionHtml(condition) { const pass = Boolean(condition.passed); const detail = [condition.actual !== undefined ? `الفعلي: ${condition.actual}` : '', condition.expected !== undefined ? `المطلوب: ${condition.expected}` : ''].filter(Boolean).join(' · '); return `<div class="condition ${pass ? 'pass' : 'fail'}"><span class="mark">${pass ? '✓' : '×'}</span><div>${esc(condition.label_ar || condition.key || 'شرط')}<small>${esc(detail)}</small></div></div>`; }
+    function strategyHtml(item) { const name = strategyNames[item.strategy] || item.label_ar || item.strategy; const progress = Number(item.progress_pct || 0); const open = item.ready ? ' open' : ''; return `<details class="strategy"${open}><summary><span class="strategy-title">${esc(name)}</span><span class="strategy-count">${esc(item.passed_conditions ?? 0)} / ${esc(item.total_conditions ?? 0)} · ${progress.toFixed(0)}%</span></summary><div class="progress" style="margin-top:6px"><i style="width:${Math.max(0,Math.min(100,progress))}%"></i></div><div class="condition-list">${(item.conditions || []).map(conditionHtml).join('') || '<div class="condition">لا توجد بيانات شروط</div>'}</div>${Object.keys(item.component_scores || {}).length ? `<div class="score-row">${Object.entries(item.component_scores).map(([k,v]) => `<span class="score-pill">${esc(k)} ${esc(v)}</span>`).join('')}</div>` : ''}</details>`; }
+    function symbolCard(item) { const strategies = item.strategy_diagnostics || []; const totalPass = strategies.reduce((n,s) => n + Number(s.passed_conditions || 0), 0); const total = strategies.reduce((n,s) => n + Number(s.total_conditions || 0), 0); const score = item.quality_score ?? '—'; const regime = item.regime ? `${item.regime.trend_direction || '—'} · ${item.regime.structure_mode || '—'}` : '—'; return `<article class="symbol-card"><div class="symbol-card-head"><span class="symbol-name">${esc(item.symbol)} <small>${esc(item.setup ? strategyNames[item.setup] || item.setup : 'لا setup مكتمل')}</small></span>${badge(item.decision_status || item.status)}</div><div class="symbol-card-body"><div class="symbol-line"><span>سكور القرار</span><b>${esc(score)} / 100</b></div><div class="symbol-line"><span>الشروط الكلية</span><b>${totalPass} / ${total}</b></div><div class="symbol-line"><span>regime</span><b>${esc(regime)}</b></div><div class="symbol-line"><span>EV</span><b>${esc(item.ev_status || '—')} (${esc(item.ev_sample_size ?? 0)})</b></div><div class="progress" style="margin:9px 0 3px"><i style="width:${total ? (totalPass / total) * 100 : 0}%"></i></div><div class="strategy-list">${strategies.length ? strategies.map(strategyHtml).join('') : '<div class="empty">تشخيص الاستراتيجيات غير موجود في هذه الدورة القديمة.</div>'}</div>${(item.reason_codes || []).length ? `<div class="notice" style="margin:10px 0 0;padding:8px 9px;font-size:9px"><strong>سبب القرار:</strong> ${esc(item.reason_codes.join(' · '))}</div>` : ''}</div></article>`; }
+    function renderStrategySummary(items) { const rows = STRATEGIES.map(strategy => items.flatMap(x => x.strategy_diagnostics || []).filter(x => x.strategy === strategy)); $('strategySummary').innerHTML = rows.map((list,i) => { const ready = list.filter(x => x.ready).length; const avg = list.length ? list.reduce((n,x) => n + Number(x.progress_pct || 0), 0) / list.length : 0; return `<div class="strategy-summary-card"><strong>${esc(strategyNames[STRATEGIES[i]])}</strong><span>${ready} جاهزة من ${list.length || items.length} · متوسط الشروط ${avg.toFixed(0)}%</span><div class="progress" style="margin-top:8px"><i style="width:${avg}%"></i></div></div>`; }).join(''); }
+    function renderSymbolGrid(items) { const q = ($('symbolSearch')?.value || '').trim().toUpperCase(); const filtered = items.filter(x => !q || String(x.symbol).includes(q)); if (!filtered.length) { $('symbolGrid').innerHTML = '<div class="empty">لا يوجد رمز مطابق.</div>'; return; } $('symbolGrid').innerHTML = filtered.sort((a,b) => String(a.symbol).localeCompare(String(b.symbol))).map(symbolCard).join(''); setText('strategyMeta', `${filtered.length} رمز معروض · آخر دورة`); }
+    function renderCycle(detail) { state.cycle = detail; const run = detail?.run || {}; const summary = run.summary || {}; const items = Object.values(summary.symbol_diagnostics || {}); const requested = Number(run.symbols_requested || summary.symbols_requested || 0); const processed = Number(run.symbols_processed || summary.symbols_processed || 0); const overview = `<div class="cycle-top"><div class="cycle-kpi"><span>حالة الدورة</span><strong>${badge(run.status || '—')}</strong></div><div class="cycle-kpi"><span>الرموز</span><strong>${processed} / ${requested}</strong></div><div class="cycle-kpi"><span>القرارات</span><strong>${esc(run.decisions_count ?? 0)}</strong></div><div class="cycle-kpi"><span>الأخطاء</span><strong class="${Number(run.error_count) ? 'negative' : 'positive'}">${esc(run.error_count ?? 0)}</strong></div><div class="cycle-kpi"><span>المدة</span><strong>${run.finished_at_ms && run.started_at_ms ? `${Number(run.finished_at_ms) - Number(run.started_at_ms)} ms` : '—'}</strong></div></div><div class="notice"><strong>معنى النتيجة:</strong> كل رمز يملك بطاقة مستقلة. انتقل إلى «الرموز والاستراتيجيات» لرؤية الشروط الأربعة بالتفصيل. ${items.length ? `تم حفظ تشخيص ${items.length} رمزًا.` : 'هذه دورة قديمة لا تحتوي بعد على تشخيص الاستراتيجيات؛ سيظهر في الدورة التالية.'}</div>`; $('cycleOverviewBox').innerHTML = overview; setText('cycleMeta', `${fmtTime(run.started_at_ms)} · ${esc(run.cycle_id || '—')}`); renderStrategySummary(items); renderSymbolGrid(items); }
+    async function loadLatestCycle() { try { const rows = await getJson('/api/cycles?limit=1'); if (!rows?.length) { $('cycleOverviewBox').innerHTML = '<div class="empty">لا توجد دورة مسجلة بعد.</div>'; return; } const detail = await getJson(`/api/cycles/${encodeURIComponent(rows[0].cycle_id)}`); renderCycle(detail); } catch (_) { $('cycleOverviewBox').innerHTML = '<div class="error">تعذر تحميل Cycle Summary.</div>'; } }
+    const stageNames = { CYCLE_START:'بدء الدورة', POSTGRES_CONNECT:'اتصال PostgreSQL', REDIS_CONNECT:'اتصال Redis', BINANCE_SERVER_TIME:'وقت Binance', EXCHANGE_INFO:'معلومات الأزواج', SYMBOL_VALIDATE:'تحقق الرمز', CANDLE_FETCH:'جلب الشموع', FEATURE_GATE:'بوابة البيانات', DECISION_EVALUATE:'تقييم القرار', CANDLE_PERSIST:'حفظ الشموع', DECISION_PERSIST:'حفظ القرار', REDIS_PUBLISH:'نشر Redis', PAPER_EXECUTION:'تنفيذ Paper', PAPER_EXIT:'خروج Paper', EV_CALIBRATION:'معايرة EV', STALE_CYCLE_RECOVERY:'استرداد دورة', CYCLE_UNHANDLED:'خطأ الدورة' };
+    function renderCycles(rows) { if (!rows?.length) { $('cyclesBox').innerHTML = '<div class="empty">لا توجد دورات مطابقة.</div>'; return; } $('cyclesBox').innerHTML = rows.map(row => `<div class="list-row"><div><strong class="ltr">${esc(row.cycle_id)}</strong><small>${fmtTime(row.started_at_ms)} · ${esc(row.symbols_processed ?? 0)} / ${esc(row.symbols_requested ?? 0)} رمز · ${esc(row.decisions_count ?? 0)} قرار</small></div>${badge(row.status)}<button class="btn open-cycle" data-cycle-id="${esc(row.cycle_id)}">فتح</button></div>`).join(''); document.querySelectorAll('.open-cycle').forEach(button => button.addEventListener('click', () => loadCycleDetail(button.dataset.cycleId))); }
+    function renderCycleDetail(detail) { const run=detail?.run||{}; const events=detail?.events||[]; const rows=events.map(event=>{const reasons=(event.reason_codes||[]).join(' · ');const error=event.error_type?` · ${event.error_type}: ${event.error_message||''}`:'';return `<div class="list-row"><div><strong>${esc(stageNames[event.stage]||event.stage)} ${event.symbol?`· ${esc(event.symbol)}`:''}</strong><small>${fmtTime(event.event_time_ms)} · ${reasons ? esc(reasons) : 'بدون أسباب'}</small></div>${badge(event.status)}<small>${event.duration_ms == null ? '—' : `${esc(event.duration_ms)} ms`}${error ? esc(error) : ''}</small></div>`}).join(''); $('cycleDetailBox').innerHTML = `<div class="notice"><strong>تفاصيل الدورة:</strong> <span class="ltr">${esc(run.cycle_id||'—')}</span> · ${badge(run.status||'—')} · ${esc(run.symbols_processed??0)} / ${esc(run.symbols_requested??0)} رمز · ${esc(run.error_count??0)} أخطاء</div><div class="list">${rows || '<div class="empty">لا توجد أحداث.</div>'}</div>`; }
+    async function loadCycleDetail(cycleId) { try { $('cycleDetailBox').innerHTML='<div class="empty">جارٍ تحميل تفاصيل الدورة…</div>'; renderCycleDetail(await getJson(`/api/cycles/${encodeURIComponent(cycleId)}`)); } catch (_) { $('cycleDetailBox').innerHTML='<div class="error">تعذر قراءة تفاصيل الدورة.</div>'; } }
+    async function loadCycles() { try { const q=($('cycleSearch')?.value||'').trim(); renderCycles(await getJson(`/api/cycles?limit=100&search=${encodeURIComponent(q)}`)); } catch (_) { $('cyclesBox').innerHTML='<div class="error">تعذر قراءة الدورات.</div>'; } }
 
-    function decisionRow(item) {
-      const payload = item.payload || {};
-      return `<tr><td class="symbol">${esc(item.symbol)}</td><td>${statusBadge(item.status)}</td><td>${fmtTime(item.decision_time_ms)}</td><td>${esc(payload.setup || payload.regime?.trend_direction || '—')}</td><td class="subtle">${esc((payload.reason_codes || []).slice(0, 2).join(', ') || '—')}</td></tr>`;
-    }
-    function renderDecisionTable(items, target) {
-      if (!items?.length) { $(target).innerHTML = '<div class="empty">لا توجد قرارات محفوظة حتى الآن.</div>'; return; }
-      $(target).innerHTML = `<table><thead><tr><th>الرمز</th><th>الحالة</th><th>الوقت</th><th>setup / regime</th><th>أسباب</th></tr></thead><tbody>${items.map(decisionRow).join('')}</tbody></table>`;
-    }
+    function renderOrders(items) { if (!items?.length) { $('ordersBox').innerHTML = '<div class="empty">لا توجد صفقات ورقية. هذا متوقع ما دامت قرارات ENTER غير متاحة.</div>'; return; } $('ordersBox').innerHTML = items.map(x => `<div class="list-row"><div><strong>${esc(x.symbol)} · ${esc(x.order_id)}</strong><small>${esc(x.side)} · ${esc(x.order_type)} · ${fmtTime(x.updated_at ? Date.parse(x.updated_at) : 0)}</small></div>${badge(x.status)}<small>${esc(x.filled_quantity ?? 0)} @ ${fmtPrice(x.average_fill_price || x.requested_price)}</small></div>`).join(''); }
+    async function loadOrders() { try { const params = new URLSearchParams({view:state.orderView, search:($('orderSearch')?.value || '').trim(), limit:'200'}); renderOrders(await getJson(`/api/paper-orders?${params}`)); } catch (_) { $('ordersBox').innerHTML = '<div class="error">تعذر قراءة الصفقات الورقية.</div>'; } }
+    function renderDecisions(items) { if (!items?.length) { $('decisionsBox').innerHTML = '<div class="empty">لا توجد قرارات.</div>'; return; } $('decisionsBox').innerHTML = items.slice(0,30).map(x => { const p=x.payload||{}; return `<div class="list-row"><div><strong>${esc(x.symbol)} · ${esc(p.setup || 'لا setup')}</strong><small>${fmtTime(x.decision_time_ms)} · ${(p.reasons || p.reason_codes || []).slice(0,3).join(' · ')}</small></div>${badge(x.status)}<small>score ${esc(p.quality ?? '—')}</small></div>`; }).join(''); }
+    async function loadDecisions() { try { const search=($('decisionSearch')?.value || '').trim(); const rows=await getJson(`/api/decisions?limit=100&search=${encodeURIComponent(search)}`); renderDecisions(rows); setText('decisionCount', search ? `${rows.length} معروض` : `${state.summary?.recent_decisions ?? rows.length} إجمالي`); } catch (_) { $('decisionsBox').innerHTML = '<div class="error">تعذر قراءة القرارات.</div>'; } }
+    function renderLogs(items) { if (!items?.length) { $('logsBox').innerHTML = '<div class="empty">لا توجد سجلات مطابقة.</div>'; return; } $('logsBox').innerHTML = items.slice(0,100).map(x => `<div class="list-row"><div><strong class="${x.level === 'ERROR' ? 'negative' : x.level === 'WARNING' ? 'neutral' : 'positive'}">${esc(x.level)} · ${esc(x.logger)}</strong><small>${esc(x.message)}</small></div><small>${fmtTime(x.timestamp)}</small></div>`).join(''); }
+    async function loadLogs() { try { const q=($('logSearch')?.value || '').trim(); renderLogs(await getJson(`/api/logs?limit=200&search=${encodeURIComponent(q)}`)); } catch (_) { $('logsBox').innerHTML = '<div class="error">تعذر قراءة السجل.</div>'; } }
 
-    function renderOrders(items) {
-      if (!items?.length) { $('ordersBox').innerHTML = '<div class="empty">لا توجد صفقات مطابقة في قاعدة البيانات.</div>'; return; }
-      $('ordersBox').innerHTML = `<table><thead><tr><th>رقم الأمر</th><th>الرمز</th><th>الدورة</th><th>الحالة</th><th>الكمية المطلوبة</th><th>سعر الطلب</th><th>متوسط التعبئة</th><th>آخر تحديث</th></tr></thead><tbody>${items.map((item) => `<tr><td class="subtle">${esc(item.order_id)}</td><td class="symbol">${esc(item.symbol)}</td><td>${item.lifecycle === 'closed' ? '<span class="badge badge-blue">مغلقة</span>' : '<span class="badge badge-amber">مفتوحة</span>'}</td><td>${statusBadge(item.status)}</td><td>${esc(item.requested_quantity)}</td><td>${fmtPrice(item.requested_price)}</td><td>${fmtPrice(item.average_fill_price)}</td><td>${fmtTime(item.updated_at ? Date.parse(item.updated_at) : 0)}</td></tr>`).join('')}</tbody></table>`;
-    }
-
-    function renderLogs(items) {
-      if (!items?.length) { $('logsBox').innerHTML = '<div class="empty">لا توجد سجلات مطابقة بعد تشغيل الخدمة.</div>'; return; }
-      $('logsBox').innerHTML = `<table><thead><tr><th>الوقت</th><th>المستوى</th><th>المكوّن</th><th>الرسالة</th></tr></thead><tbody>${items.map((item) => `<tr><td class="timestamp subtle">${fmtTime(item.timestamp)}</td><td class="log-level ${item.level === 'ERROR' ? 'negative' : item.level === 'WARNING' ? 'neutral' : 'positive'}">${esc(item.level)}</td><td class="subtle">${esc(item.logger)}</td><td>${esc(item.message)}</td></tr>`).join('')}</tbody></table>`;
-    }
-
-    async function loadSummary() {
-      try {
-        const data = await getJson('/api/dashboard/summary');
-        state.summary = data;
-        setText('serviceMetric', data.service === 'online' ? 'Online' : '—');
-        setText('envMetric', `${data.environment || '—'} · Paper`);
-        setText('dbMetric', data.database === 'connected' ? 'Connected' : data.database || '—');
-        setText('redisMetric', data.redis === 'connected' ? 'Connected' : data.redis || '—');
-        setText('openMetric', data.orders?.open ?? 0);
-        setText('closedMetric', data.orders?.closed ?? 0);
-        const worker = data.paper_worker || {};
-        setText('workerMetric', worker.running ? 'Running' : worker.enabled ? 'Stopped' : 'Disabled');
-        const source = worker.last_cycle_data_source || data.worker_data_source || 'لم تبدأ دورة بعد';
-        setText('workerMetricSub', worker.last_cycle_status ? `آخر دورة: ${worker.last_cycle_status} · ${source}` : `بانتظار أول دورة · ${source}`);
-        const sourceNote = $('sourceNote');
-        if (sourceNote) sourceNote.innerHTML = `<strong>مصادر البيانات:</strong> العرض اللحظي من Binance WebSocket/REST العام، بينما Worker حلّل ${esc(data.worker_symbols ?? '—')} رمزًا من <span class="mono">${esc(source)}</span>. Binance US مصدر مستقل عن Binance.com، ولا توجد أوامر حية.`;
-        if (data.live_trading_enabled !== false || data.trading_mode !== 'paper') document.querySelector('.mode-chip').innerHTML = '<span class="dot"></span> تحقق من وضع التشغيل';
-      } catch (error) { setText('serviceMetric', 'خطأ'); setText('envMetric', 'تعذر جلب الملخص'); }
-    }
-    async function loadBrowserMarket() {
-      const params = encodeURIComponent(JSON.stringify(DASHBOARD_SYMBOLS));
-      const hosts = ['https://api.binance.com', 'https://api1.binance.com', 'https://api2.binance.com'];
-      let lastError = null;
-      for (const host of hosts) {
-        try {
-          const response = await fetch(`${host}/api/v3/ticker/price?symbols=${params}`, { headers: { 'Accept': 'application/json' } });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const rows = await response.json();
-          state.tickers = rows.map((item) => ({ symbol: item.symbol, price: item.price, change_percent: null, high: null, low: null, volume: null, quote_volume: null, updated_at_ms: Date.now() }));
-          setText('marketUpdated', `Binance مباشر · ${fmtTime(Date.now())}`);
-          renderMarket();
-          return;
-        } catch (error) { lastError = error; }
-      }
-      throw lastError || new Error('Browser market fallback failed');
-    }
-    async function loadMarket() {
-      connectMarketSocket();
-      if (marketSocket?.readyState === WebSocket.OPEN && state.tickers.length) return;
-      try {
-        const data = await getJson('/api/market/tickers', 4500);
-        if (data.data?.length) state.tickers = data.data;
-        if (!marketSocket || marketSocket.readyState !== WebSocket.OPEN) setText('marketUpdated', `REST fallback · ${fmtTime(data.updated_at_ms)}`);
-        renderMarket();
-      } catch (error) {
-        try { await loadBrowserMarket(); }
-        catch (browserError) { if (!state.tickers.length) $('marketBox').innerHTML = '<div class="error-box">تعذر جلب بيانات Binance العامة حاليًا. ستتم المحاولة تلقائيًا.</div>'; }
-      }
-    }
-    async function loadDecisions() {
-      try { const search = ($('decisionSearch')?.value || '').trim(); const items = await getJson(`/api/decisions?limit=100&search=${encodeURIComponent(search)}`); renderDecisionTable(items, 'decisionsBox'); renderDecisionTable(items.slice(0, 6), 'decisionPreview'); const total = state.summary?.recent_decisions; setText('decisionCount', search ? `${items.length} معروض · بحث` : `${total ?? items.length} قرار إجمالًا`); }
-      catch (error) { $('decisionsBox').innerHTML = '<div class="error-box">تعذر قراءة القرارات من PostgreSQL.</div>'; $('decisionPreview').innerHTML = '<div class="empty">تعذر القراءة</div>'; }
-    }
-    async function loadOrders() {
-      try { const params = new URLSearchParams({ view: state.orderView, search: ($('orderSearch')?.value || '').trim(), limit: '200' }); renderOrders(await getJson(`/api/paper-orders?${params}`)); }
-      catch (error) { $('ordersBox').innerHTML = '<div class="error-box">تعذر قراءة الصفقات الورقية من PostgreSQL.</div>'; }
-    }
-    async function loadLogs() {
-      try { const params = new URLSearchParams({ search: ($('logSearch')?.value || '').trim(), level: $('logLevel')?.value || '', limit: '200' }); renderLogs(await getJson(`/api/logs?${params}`)); }
-      catch (error) { $('logsBox').innerHTML = '<div class="error-box">تعذر قراءة سجل التطبيق.</div>'; }
-    }
-    function renderCycles(items) {
-      if (!items?.length) { $('cyclesBox').innerHTML = '<div class="empty">لا توجد دورات مسجلة بعد. ستظهر هنا عند تشغيل Paper Worker.</div>'; $('cycleDetailBox').innerHTML = ''; return; }
-      $('cyclesBox').innerHTML = `<table><thead><tr><th>رقم الدورة</th><th>الحالة</th><th>بدأت</th><th>المدة</th><th>الرموز</th><th>القرارات</th><th>الأخطاء</th><th>تفاصيل</th></tr></thead><tbody>${items.map((item) => `<tr><td class="mono">${esc(item.cycle_id)}</td><td>${cycleStatusBadge(item.status)}</td><td>${fmtTime(item.started_at_ms)}</td><td>${fmtDuration(item.finished_at_ms && item.started_at_ms ? Number(item.finished_at_ms) - Number(item.started_at_ms) : null)}</td><td>${esc(item.symbols_processed ?? 0)} / ${esc(item.symbols_requested ?? 0)}</td><td>${esc(item.decisions_count ?? 0)}</td><td class="${Number(item.error_count) > 0 ? 'cycle-error' : ''}">${esc(item.error_count ?? 0)}</td><td><button class="btn cycle-open" data-cycle-id="${esc(item.cycle_id)}">فتح</button></td></tr>`).join('')}</tbody></table>`;
-      document.querySelectorAll('.cycle-open').forEach((button) => button.addEventListener('click', () => loadCycleDetail(button.dataset.cycleId)));
-      loadCycleDetail(items[0].cycle_id);
-    }
-    function renderCycleDetail(data) {
-      if (!data?.run) { $('cycleDetailBox').innerHTML = ''; return; }
-      const run = data.run;
-      const summary = run.summary || {};
-      const reasonCounts = summary.reason_counts || {};
-      const reasons = Object.entries(reasonCounts).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10).map(([key, value]) => `<span class="badge badge-amber">${esc(key)}: ${esc(value)}</span>`).join(' ') || '<span class="subtle">لا توجد أسباب مرفقة</span>';
-      const events = data.events || [];
-      const source = summary.binance_data_source || 'غير مسجل';
-      const eventRows = events.map((event) => { const metrics = event.metrics || {}; const metricText = Object.entries(metrics).filter(([key, value]) => value !== null && value !== undefined && !['code_version','config_version'].includes(key)).slice(0, 4).map(([key, value]) => `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`).join(' · '); const error = event.error_type ? ` ${event.error_type}: ${event.error_message || ''}` : ''; return `<tr><td>${esc(event.sequence_id)}</td><td>${fmtTime(event.event_time_ms)}</td><td>${esc(event.symbol || '—')}</td><td>${esc(stageLabel[event.stage] || event.stage)}</td><td>${statusBadge(event.status)}</td><td>${fmtDuration(event.duration_ms)}</td><td class="subtle">${esc([...(event.reason_codes || []), metricText, error].filter(Boolean).join(' · ') || '—')}</td></tr>`; }).join('');
-      $('cycleDetailBox').innerHTML = `<div class="panel-head"><div><h3 class="panel-title">تفاصيل الدورة <span class="mono">${esc(run.cycle_id)}</span></h3><p class="panel-desc">${fmtTime(run.started_at_ms)} → ${fmtTime(run.finished_at_ms)} · code ${esc(run.code_version)} · config ${esc(run.config_version)}</p><p class="panel-desc"><strong>مصدر بيانات Worker:</strong> <span class="mono">${esc(source)}</span></p></div><div>${cycleStatusBadge(run.status)}</div></div><div class="cycle-grid"><div class="cycle-stat"><span>الرموز المعالجة</span><strong>${esc(run.symbols_processed)} / ${esc(run.symbols_requested)}</strong></div><div class="cycle-stat"><span>القرارات</span><strong>${esc(run.decisions_count)}</strong></div><div class="cycle-stat"><span>أوامر منشأة</span><strong>${esc(run.orders_created)}</strong></div><div class="cycle-stat"><span>الأخطاء</span><strong class="${Number(run.error_count) ? 'cycle-error' : 'cycle-ok'}">${esc(run.error_count)}</strong></div></div><p class="panel-desc"><strong>أكثر أسباب القرار:</strong> ${reasons}</p><div class="table-wrap"><table><thead><tr><th>#</th><th>الوقت</th><th>الرمز</th><th>المرحلة</th><th>النتيجة</th><th>المدة</th><th>الأسباب والمقاييس</th></tr></thead><tbody>${eventRows || '<tr><td colspan="7" class="empty">لا توجد أحداث للدورة.</td></tr>'}</tbody></table></div>`;
-    }
-    async function loadCycleDetail(cycleId) {
-      try { $('cycleDetailBox').innerHTML = '<div class="empty">جارٍ تحميل timeline…</div>'; renderCycleDetail(await getJson(`/api/cycles/${encodeURIComponent(cycleId)}`)); }
-      catch (error) { $('cycleDetailBox').innerHTML = '<div class="error-box">تعذر قراءة تفاصيل الدورة.</div>'; }
-    }
-    async function loadCycles() {
-      try { const params = new URLSearchParams({ search: ($('cycleSearch')?.value || '').trim(), limit: '200' }); renderCycles(await getJson(`/api/cycles?${params}`)); }
-      catch (error) { $('cyclesBox').innerHTML = '<div class="error-box">تعذر قراءة Cycle Summary. تأكد من تطبيق migration 0005.</div>'; }
-    }
-    async function refreshAll() { $('refreshBtn').classList.add('loading'); await Promise.allSettled([loadSummary(), loadMarket(), loadDecisions(), loadOrders(), loadLogs(), loadCycles()]); setText('lastRefresh', new Date().toLocaleTimeString('ar-EG')); $('refreshBtn').classList.remove('loading'); }
-    function activateTab(tab) { document.querySelectorAll('.nav button').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab)); document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `${tab}View`)); if (tab === 'orders') loadOrders(); if (tab === 'decisions') loadDecisions(); if (tab === 'logs') loadLogs(); if (tab === 'cycles') loadCycles(); }
-
-    document.querySelectorAll('.nav button').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.tab)));
-    document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.go)));
-    document.querySelectorAll('[data-order-view]').forEach((button) => button.addEventListener('click', () => { state.orderView = button.dataset.orderView; document.querySelectorAll('[data-order-view]').forEach((item) => item.classList.toggle('active', item === button)); loadOrders(); }));
-    $('refreshBtn').addEventListener('click', refreshAll);
-    $('marketSearch').addEventListener('input', renderMarket);
-    $('orderSearch').addEventListener('input', loadOrders);
-    $('decisionSearch').addEventListener('input', loadDecisions);
-    $('logSearch').addEventListener('input', loadLogs);
-    $('logLevel').addEventListener('change', loadLogs);
-    $('cycleSearch').addEventListener('input', loadCycles);
-    refreshAll();
-    setInterval(() => { loadSummary(); loadMarket(); }, 15000);
-    setInterval(() => { loadOrders(); loadDecisions(); loadLogs(); loadCycles(); }, 30000);
+    function activateTab(tab) { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === tab)); document.querySelectorAll('.view').forEach(x => x.classList.toggle('active', x.id === `${tab}View`)); if (tab === 'strategies') { renderSymbolGrid(Object.values(state.cycle?.run?.summary?.symbol_diagnostics || {})); } if (tab === 'cycles') loadCycles(); if (tab === 'orders') loadOrders(); if (tab === 'logs') { loadDecisions(); loadLogs(); } }
+    async function refreshAll() { $('refreshBtn').classList.add('loading'); await Promise.allSettled([loadSummary(), loadMarket(), loadLatestCycle(), loadDecisions(), loadOrders(), loadLogs()]); setText('lastRefresh', new Date().toLocaleTimeString('ar-EG')); $('refreshBtn').classList.remove('loading'); }
+    document.querySelectorAll('.tab').forEach(x => x.addEventListener('click', () => activateTab(x.dataset.tab)));
+    document.querySelectorAll('.order-filter').forEach(x => x.addEventListener('click', () => { state.orderView=x.dataset.orderView; document.querySelectorAll('.order-filter').forEach(y => y.classList.toggle('active', y===x)); loadOrders(); }));
+    $('refreshBtn').addEventListener('click', refreshAll); $('marketSearch').addEventListener('input', renderMarket); $('symbolSearch').addEventListener('input', () => renderSymbolGrid(Object.values(state.cycle?.run?.summary?.symbol_diagnostics || {}))); $('cycleSearch').addEventListener('input', loadCycles); $('orderSearch').addEventListener('input', loadOrders); $('decisionSearch').addEventListener('input', loadDecisions); $('logSearch').addEventListener('input', loadLogs);
+    refreshAll(); setInterval(() => { loadSummary(); loadMarket(); loadLatestCycle(); }, 15000); setInterval(() => { loadCycles(); loadOrders(); loadDecisions(); loadLogs(); }, 30000);
   </script>
 </body>
 </html>

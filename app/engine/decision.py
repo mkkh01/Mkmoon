@@ -10,7 +10,7 @@ from app.engine.features import compute_features
 from app.engine.regime import classify_regime
 from app.engine.risk import RiskFilters, calculate_risk_plan
 from app.engine.scoring import score_candidate
-from app.engine.setups import evaluate_setup
+from app.engine.setups import evaluate_setup_with_diagnostics
 
 
 def evaluate_decision(
@@ -35,6 +35,7 @@ def evaluate_decision(
     entry = stop = target = None
     quality = None
     components: dict[str, Decimal] = {}
+    strategy_diagnostics: list[dict] = []
     edge = policy.get("edge", {})
     minimum_sample = int(edge.get("minimum_sample", 100))
     minimum_ev_r = Decimal(str(edge.get("minimum_ev_r", "0.10")))
@@ -47,7 +48,7 @@ def evaluate_decision(
         status = DecisionStatus.UNSAFE
         reasons.append("DATA_UNSAFE")
     else:
-        candidate = evaluate_setup(candles_by_timeframe, features, regime)
+        candidate, strategy_diagnostics = evaluate_setup_with_diagnostics(candles_by_timeframe, features, regime)
         if candidate is None:
             status = DecisionStatus.WATCH
             reasons.append("SETUP_INCOMPLETE")
@@ -100,6 +101,7 @@ def evaluate_decision(
         "target": target,
         "quality": quality,
         "components": components,
+        "strategy_diagnostics": strategy_diagnostics,
         "risk": risk.model_dump(mode="json") if risk else None,
         "ev_status": ev_status,
         "ev_r": ev_r,
@@ -127,6 +129,7 @@ def evaluate_decision(
         target_price=target,
         quality_score=quality,
         component_scores=components,
+        strategy_diagnostics=strategy_diagnostics,
         risk=risk,
         ev_status=ev_status,
         ev_r=ev_r,

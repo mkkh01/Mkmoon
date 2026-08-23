@@ -101,6 +101,7 @@ class Decision(BaseModel):
     target_price: Decimal | None = None
     quality_score: Decimal | None = None
     component_scores: dict[str, Decimal] = Field(default_factory=dict)
+    strategy_diagnostics: list[dict[str, Any]] = Field(default_factory=list)
     risk: RiskPlan | None = None
     ev_status: str = "INSUFFICIENT_DATA"
     ev_r: Decimal | None = None

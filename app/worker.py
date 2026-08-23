@@ -148,7 +148,7 @@ async def _run_cycle(
         "paper_filled_orders": 0, "execution_skipped": 0, "execution_blocked": 0,
         "error_count": 0, "audit_write_errors": 0, "candle_counts": {},
         "decision_status_counts": {status.value: 0 for status in DecisionStatus},
-        "reason_counts": {}, "lock": "redis:paper-cycle" if redis_ready else "unavailable",
+        "reason_counts": {}, "symbol_diagnostics": {}, "lock": "redis:paper-cycle" if redis_ready else "unavailable",
         "sources_seen": [],
     }
     emit_lock = asyncio.Lock()
@@ -237,6 +237,11 @@ async def _run_cycle(
                 info = exchange.get(symbol)
                 if info is None or info.status != "TRADING":
                     stats["symbols_skipped"] += 1
+                    stats["symbol_diagnostics"][symbol] = {
+                        "symbol": symbol, "status": "SKIPPED", "decision_status": None,
+                        "reason_codes": ["SYMBOL_UNAVAILABLE_OR_NOT_TRADING"],
+                        "strategy_diagnostics": [],
+                    }
                     await emit("SYMBOL_VALIDATE", "SKIPPED", symbol=symbol, reason_codes=["SYMBOL_UNAVAILABLE_OR_NOT_TRADING"])
                     return
                 candles_by_tf: dict[str, list] = {}
@@ -281,6 +286,12 @@ async def _run_cycle(
                         symbol_failed = True
                 if symbol_failed:
                     stats["symbols_failed"] += 1
+                    stats["symbol_diagnostics"][symbol] = {
+                        "symbol": symbol, "status": "FAILED", "decision_status": None,
+                        "reason_codes": ["CANDLE_DATA_INCOMPLETE"],
+                        "strategy_diagnostics": [],
+                        "timeframes_received": sorted(candles_by_tf),
+                    }
                     await emit("FEATURE_GATE", "BLOCKED", symbol=symbol, reason_codes=["CANDLE_DATA_INCOMPLETE"],
                                metrics={"timeframes_received": sorted(candles_by_tf)})
                     return
@@ -329,6 +340,23 @@ async def _run_cycle(
                 stats["decision_status_counts"][status_value] += 1
                 for reason in decision.reason_codes:
                     stats["reason_counts"][reason] = stats["reason_counts"].get(reason, 0) + 1
+                stats["symbol_diagnostics"][symbol] = {
+                    "symbol": symbol,
+                    "status": "PROCESSED",
+                    "decision_status": status_value,
+                    "decision_id": decision.decision_id,
+                    "data_cutoff_ms": decision.data_cutoff_ms,
+                    "setup": decision.setup.value if decision.setup else None,
+                    "quality_score": str(decision.quality_score) if decision.quality_score is not None else None,
+                    "component_scores": {key: str(value) for key, value in decision.component_scores.items()},
+                    "reason_codes": decision.reason_codes,
+                    "invalidation_codes": decision.invalidation_codes,
+                    "regime": decision.regime.model_dump(mode="json") if decision.regime else None,
+                    "ev_status": decision.ev_status,
+                    "ev_sample_size": decision.ev_sample_size,
+                    "strategy_diagnostics": decision.strategy_diagnostics,
+                    "data_source": decision.lineage.get("data_source"),
+                }
                 await emit("DECISION_EVALUATE", status_value, symbol=symbol,
                            duration_ms=int((time.monotonic() - decision_started) * 1000),
                            reason_codes=decision.reason_codes,
@@ -336,6 +364,8 @@ async def _run_cycle(
                                     "quality_score": str(decision.quality_score) if decision.quality_score is not None else None,
                                     "setup": decision.setup.value if decision.setup else None,
                                     "ev_status": decision.ev_status, "ev_sample_size": decision.ev_sample_size,
+                                    "component_scores": {key: str(value) for key, value in decision.component_scores.items()},
+                                    "strategy_diagnostics": decision.strategy_diagnostics,
                                     "data_source": decision.lineage.get("data_source")})
 
                 persisted = False
@@ -398,6 +428,10 @@ async def _run_cycle(
             )
             for symbol, result in zip(symbols, symbol_results):
                 if isinstance(result, Exception):
+                    stats["symbol_diagnostics"].setdefault(symbol, {
+                        "symbol": symbol, "status": "FAILED", "decision_status": None,
+                        "reason_codes": ["SYMBOL_UNHANDLED"], "strategy_diagnostics": [],
+                    })
                     await persist_error("SYMBOL_UNHANDLED", result, symbol=symbol)
     except asyncio.CancelledError:
         raise

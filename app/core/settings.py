@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     database_url: str | None = None
     redis_url: str | None = None
-    symbols: str = "BTCUSDT,ETHUSDT,SOLUSDT"
+    symbols: str = "BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT"
     timezone: str = "UTC"
     candle_persistence_enabled: bool = True
 
