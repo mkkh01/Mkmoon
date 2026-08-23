@@ -89,6 +89,7 @@ def test_keyboard_contains_read_only_actions_only() -> None:
     labels = [button["text"] for row in keyboard["keyboard"] for button in row]
     assert "حالة النظام" in labels
     assert "آخر دورة" in labels
+    assert "الأسعار الحية" in labels
     assert "الصفقات الورقية" in labels
     assert not any(label in labels for label in ("شراء", "بيع", "تفعيل Live", "Force ENTER"))
 
@@ -110,6 +111,36 @@ async def test_start_sends_menu_without_raw_token() -> None:
         assert "مرحبًا بك في Mkmoon" in sent[0][1]["text"]
     finally:
         await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_live_prices_view_is_read_only_and_formats_public_tickers() -> None:
+    bot = make_bot(get_tickers=lambda: _sample_tickers())
+    sent: list[tuple[str, dict]] = []
+
+    async def fake_api(method: str, payload: dict) -> dict:
+        sent.append((method, payload))
+        return {"ok": True, "result": {}}
+
+    bot._api = fake_api  # type: ignore[method-assign]
+    try:
+        await bot.handle_update({"message": {"chat": {"id": 12345, "type": "private"}, "text": "الأسعار الحية"}})
+        text = "\n".join(payload.get("text", "") for _, payload in sent)
+        assert "الأسعار الحية" in text
+        assert "BTCUSDT" in text
+        assert "70000.12" in text
+        assert "1.25%" in text
+        assert "لا تُشغّل دورة Worker" in text
+        assert all(method == "sendMessage" for method, _ in sent)
+    finally:
+        await bot.close()
+
+
+async def _sample_tickers() -> list[dict]:
+    return [
+        {"symbol": "BTCUSDT", "price": "70000.12", "change_percent": "1.25"},
+        {"symbol": "ETHUSDT", "price": "3500", "change_percent": None},
+    ]
 
 
 @pytest.mark.asyncio

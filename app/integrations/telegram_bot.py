@@ -16,6 +16,7 @@ log = logging.getLogger("mkmoon.telegram")
 SummaryProvider = Callable[[], Awaitable[dict]]
 CycleProvider = Callable[[], Awaitable[dict | None]]
 ListProvider = Callable[[], Awaitable[list[dict]]]
+TickerProvider = Callable[[], Awaitable[list[dict]]]
 
 
 class TelegramBot:
@@ -26,6 +27,7 @@ class TelegramBot:
 
     ACTIONS = {
         "حالة النظام": "status",
+        "الأسعار الحية": "prices",
         "آخر دورة": "cycle",
         "تشخيص 25 رمزًا": "diagnostics",
         "لماذا لا توجد صفقة؟": "why",
@@ -62,6 +64,7 @@ class TelegramBot:
         allowed_chat_ids: set[int] | None = None,
         dashboard_url: str = "https://mkmoon.onrender.com/",
         get_summary: SummaryProvider,
+        get_tickers: TickerProvider | None = None,
         get_cycle: CycleProvider,
         get_decisions: ListProvider,
         get_orders: ListProvider,
@@ -81,6 +84,7 @@ class TelegramBot:
         self.allowed_chat_ids = allowed_chat_ids or set()
         self.dashboard_url = dashboard_url.rstrip("/") + "/"
         self.get_summary = get_summary
+        self.get_tickers = get_tickers
         self.get_cycle = get_cycle
         self.get_decisions = get_decisions
         self.get_orders = get_orders
@@ -185,8 +189,10 @@ class TelegramBot:
     def main_keyboard() -> dict[str, Any]:
         return {
             "keyboard": [
-                [{"text": "حالة النظام"}, {"text": "آخر دورة"}],
-                [{"text": "تشخيص 25 رمزًا"}, {"text": "لماذا لا توجد صفقة؟"}],
+                [{"text": "حالة النظام"}, {"text": "الأسعار الحية"}],
+                [{"text": "آخر دورة"}, {"text": "تشخيص 25 رمزًا"}],
+
+                [{"text": "لماذا لا توجد صفقة؟"}],
                 [{"text": "الاستراتيجيات"}, {"text": "القرارات الأخيرة"}],
                 [{"text": "الصفقات الورقية"}, {"text": "ملخص الأداء"}],
                 [{"text": "السجل والتدقيق"}, {"text": "فتح Dashboard"}],
@@ -270,9 +276,41 @@ class TelegramBot:
             lines.append("• لا توجد أسباب منع مسجلة في هذه الدورة.")
         return "\n".join(lines)
 
+    @staticmethod
+    def _price_text(rows: list[dict]) -> str:
+        if not rows:
+            return "لا توجد أسعار متاحة حاليًا من Binance."
+        lines = [
+            "<b>الأسعار الحية</b>",
+            "قراءة عامة من Binance عند الضغط — لا تُشغّل دورة Worker ولا تنفذ أوامر.",
+            "",
+        ]
+        for row in rows:
+            symbol = html.escape(str(row.get("symbol") or "—"))
+            price = html.escape(str(row.get("price") or "—"))
+            change = row.get("change_percent")
+            change_text = "غير متاح" if change in (None, "", "—") else f"{html.escape(str(change))}%"
+            lines.append(f"<code>{symbol}</code> | <b>{price}</b> USDT | 24h: {change_text}")
+        return "\n".join(lines)
+
     async def _action(self, chat_id: int, action: str) -> None:
         if action == "status":
             await self._send_html(chat_id, self._status(await self.get_summary()), self.main_keyboard())
+        elif action == "prices":
+            if self.get_tickers is None:
+                await self._send(chat_id, "مصدر الأسعار الحية غير مهيأ حاليًا.", self.main_keyboard())
+                return
+            try:
+                rows = await self.get_tickers()
+            except Exception as error:
+                log.warning("Telegram live prices unavailable error_type=%s", type(error).__name__)
+                await self._send(
+                    chat_id,
+                    "تعذر قراءة الأسعار العامة من Binance حاليًا. حاول بعد قليل؛ لم تتأثر دورة Worker.",
+                    self.main_keyboard(),
+                )
+                return
+            await self._send_html(chat_id, self._price_text(rows), self.main_keyboard())
         elif action == "cycle":
             await self._send_html(chat_id, self._cycle_text(await self.get_cycle()), self.main_keyboard())
         elif action == "diagnostics":
@@ -338,6 +376,7 @@ class TelegramBot:
                 chat_id,
                 "<b>مساعدة Mkmoon</b>\n"
                 "البوت للقراءة والتنبيهات فقط. Worker يحلل تلقائيًا، والأزرار تقرأ النتائج المحفوظة.\n"
+                "الأسعار الحية تُقرأ من Binance عند الضغط فقط، ولا تبدأ دورة جديدة.\n"
                 "Score التغطية = نسبة الشروط المحققة، وليس احتمال الربح. Quality Score يظهر فقط عند اكتمال candidate.\n"
                 "لا توجد أزرار شراء أو بيع أو تفعيل Live.",
                 self.main_keyboard(),

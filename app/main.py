@@ -100,6 +100,10 @@ async def _telegram_get_summary() -> dict:
     return await dashboard_summary()
 
 
+async def _telegram_get_tickers() -> list[dict]:
+    return await binance_public.ticker_prices(DASHBOARD_SYMBOLS)
+
+
 async def _telegram_get_cycle() -> dict | None:
     if postgres is None or postgres.pool is None:
         return None
@@ -153,6 +157,7 @@ async def lifespan(_: FastAPI):
                 allowed_chat_ids=settings.telegram_chat_ids(),
                 dashboard_url=settings.public_base_url,
                 get_summary=_telegram_get_summary,
+                get_tickers=_telegram_get_tickers,
                 get_cycle=_telegram_get_cycle,
                 get_decisions=_telegram_get_decisions,
                 get_orders=_telegram_get_orders,
