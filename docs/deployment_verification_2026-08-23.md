@@ -51,3 +51,9 @@
 ## فحص schema النهائي
 
 فحص `information_schema.columns` في Supabase أكد وجود عقود Paper المطلوبة: `paper_accounts` مع cash/equity/reserved/realized PnL، و`paper_orders` مع requested/filled/average fill/fees، و`paper_fills`، و`paper_positions` مع entry/stop/target/exit، و`risk_reservations`. جميع قراءات الفحص كانت read-only وبـ`LIMIT` صريح، ولم تُنشأ صفقة أو تُغيّر بيانات تشغيلية.
+
+## Smoke test النهائي بعد 6401d65
+
+أظهر الفحص الخارجي أن `/health` أعاد production/Paper و`live_trading_enabled=false`، وأن `/ready` أعاد `ready`. PostgreSQL وRedis متصلان، والعامل المضمّن enabled/running وآخر دورة `COMPLETED` بلا `last_cycle_error` أو `last_cycle_errors`، ومدتها نحو 3.5 ثوانٍ.
+
+آخر دورة مفحوصة: `cycle-1787486281810-70306a044a`، الحالة `COMPLETED`، 3/3 رموز، 3 قرارات، 0 أخطاء، 0 أوامر، والقرارات `WATCH=3` و`ENTER=0`. المصدران الناجحان الظاهران هما `https://api.binance.com` و`https://data-api.binance.vision`. ما زال نطاق Worker الإنتاجي 3 رموز، مقابل 25 في واجهة Dashboard، عمدًا إلى حين تحقق قائمة Binance US/مصدر التشغيل كاملًا.
