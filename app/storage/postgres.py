@@ -483,13 +483,13 @@ class PostgresStore:
             rows = await connection.fetch(
                 """
                 update cycle_runs
-                set status='FAILED', finished_at_ms=$1, error_count=error_count+1,
+                set status='FAILED', finished_at_ms=$1::bigint, error_count=error_count+1,
                     summary=summary || jsonb_build_object(
                         'recovered_as_stale', true,
-                        'recovered_at_ms', $1,
+                        'recovered_at_ms', $1::bigint,
                         'recovery_reason', 'PROCESS_RESTART_OR_CYCLE_TIMEOUT'
                     )
-                where status='RUNNING' and started_at_ms < $2
+                where status='RUNNING' and started_at_ms < $2::bigint
                 returning cycle_id
                 """,
                 now_ms,
