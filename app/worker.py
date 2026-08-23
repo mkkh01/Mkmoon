@@ -290,21 +290,27 @@ async def _run_cycle(
                     try:
                         position = await postgres.active_paper_position(symbol)
                         if position:
-                            last_candle = max(candles_by_tf["5m"], key=lambda candle: candle.close_time_ms)
-                            exit_fill = simulate_long_exit_levels(
-                                entry_price=Decimal(str(position["entry_price"])),
-                                stop_price=Decimal(str(position["stop_price"])),
-                                target_price=Decimal(str(position["target_price"])),
-                                quantity=Decimal(str(position["quantity"])), candle=last_candle,
-                                fee_rate=Decimal(str(policy["risk"]["fee_rate"])),
-                            )
-                            if exit_fill.status == "CLOSED":
-                                closed = await postgres.close_paper_position(
-                                    position, exit_fill, last_candle.close_time_ms,
-                                    {"data_source": _data_source(client, sources), "candle_time_ms": last_candle.close_time_ms},
+                            opened_at_ms = int(position["opened_at_ms"])
+                            eligible_candles = [
+                                candle for candle in candles_by_tf["5m"]
+                                if candle.close_time_ms > opened_at_ms
+                            ]
+                            if eligible_candles:
+                                last_candle = max(eligible_candles, key=lambda candle: candle.close_time_ms)
+                                exit_fill = simulate_long_exit_levels(
+                                    entry_price=Decimal(str(position["entry_price"])),
+                                    stop_price=Decimal(str(position["stop_price"])),
+                                    target_price=Decimal(str(position["target_price"])),
+                                    quantity=Decimal(str(position["quantity"])), candle=last_candle,
+                                    fee_rate=Decimal(str(policy["risk"]["fee_rate"])),
                                 )
-                                await emit("PAPER_EXIT", closed["status"], symbol=symbol,
-                                           reason_codes=[exit_fill.exit_reason or "EXIT"], metrics=closed)
+                                if exit_fill.status == "CLOSED":
+                                    closed = await postgres.close_paper_position(
+                                        position, exit_fill, last_candle.close_time_ms,
+                                        {"data_source": _data_source(client, sources), "candle_time_ms": last_candle.close_time_ms},
+                                    )
+                                    await emit("PAPER_EXIT", closed["status"], symbol=symbol,
+                                               reason_codes=[exit_fill.exit_reason or "EXIT"], metrics=closed)
                     except Exception as error:
                         await persist_error("PAPER_EXIT", error, symbol=symbol)
 
