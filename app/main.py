@@ -89,6 +89,8 @@ paper_worker_state: dict[str, object] = {
     "last_cycle_error": None,
     "last_cycle_data_source": None,
     "last_cycle_errors": [],
+    "last_cycle_symbols_requested": len(settings.symbol_list()),
+    "last_cycle_symbols_processed": 0,
 }
 
 
@@ -126,6 +128,8 @@ async def lifespan(_: FastAPI):
                     paper_worker_state["last_cycle_duration_ms"] = result.duration_ms
                     paper_worker_state["last_cycle_data_source"] = result.data_source
                     paper_worker_state["last_cycle_errors"] = list(result.errors)
+                    paper_worker_state["last_cycle_symbols_requested"] = result.symbols_requested
+                    paper_worker_state["last_cycle_symbols_processed"] = result.symbols_processed
                     if result.errors:
                         paper_worker_state["last_cycle_error"] = result.errors[-1]
                 except asyncio.CancelledError:
@@ -233,7 +237,9 @@ async def dashboard_summary() -> dict:
         "orders": counts,
         "recent_decisions": decision_count,
         "dashboard_symbols": len(DASHBOARD_SYMBOLS),
-        "worker_symbols": len(settings.symbol_list()),
+        "worker_symbols": int(paper_worker_state.get("last_cycle_symbols_requested") or len(settings.symbol_list())),
+        "worker_symbols_configured": len(settings.symbol_list()),
+        "worker_symbols_processed": int(paper_worker_state.get("last_cycle_symbols_processed") or 0),
         "worker_data_source": paper_worker_state.get("last_cycle_data_source"),
         "server_time_ms": int(time() * 1000),
         "errors": errors,

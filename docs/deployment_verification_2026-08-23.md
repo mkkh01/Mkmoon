@@ -57,3 +57,7 @@
 أظهر الفحص الخارجي أن `/health` أعاد production/Paper و`live_trading_enabled=false`، وأن `/ready` أعاد `ready`. PostgreSQL وRedis متصلان، والعامل المضمّن enabled/running وآخر دورة `COMPLETED` بلا `last_cycle_error` أو `last_cycle_errors`، ومدتها نحو 3.5 ثوانٍ.
 
 آخر دورة مفحوصة: `cycle-1787486281810-70306a044a`، الحالة `COMPLETED`، 3/3 رموز، 3 قرارات، 0 أخطاء، 0 أوامر، والقرارات `WATCH=3` و`ENTER=0`. المصدران الناجحان الظاهران هما `https://api.binance.com` و`https://data-api.binance.vision`. ما زال نطاق Worker الإنتاجي 3 رموز، مقابل 25 في واجهة Dashboard، عمدًا إلى حين تحقق قائمة Binance US/مصدر التشغيل كاملًا.
+
+## تحقق نطاق 25 أثناء إعادة التصميم
+
+بعد deploy `bd6625c` أصبح كود Dashboard وتشخيص الاستراتيجيات Live، لكن smoke test ظل يعيد `worker_symbols=3`؛ لذلك لم أعتبر المشكلة محلولة من الكود وحده. تم فتح Environment في Render وتحرير متغير `SYMBOLS` غير السري بالقائمة الكاملة ذات 25 زوجًا بعد التحقق من أن Binance.US يعيد `missing=[]`. بدأت Render إعادة deploy بسبب تحديث Environment عند 12:25، وما زال التحقق النهائي ينتظر دورة جديدة بعد اكتمالها.
