@@ -201,7 +201,7 @@
     const fmtPct = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
     const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
-    async function getJson(url) { const response = await fetch(url, { headers: { 'Accept': 'application/json' } }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }
+    async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const response = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
 
     function renderMarket() {
       const query = ($('marketSearch')?.value || '').trim().toUpperCase();
@@ -260,7 +260,7 @@
     }
     async function loadMarket() {
       try {
-        const data = await getJson('/api/market/tickers');
+        const data = await getJson('/api/market/tickers', 4500);
         state.tickers = data.data || [];
         setText('marketUpdated', `تحديث ${fmtTime(data.updated_at_ms)}`);
         renderMarket();
