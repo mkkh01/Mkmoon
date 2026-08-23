@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from app.adapters.binance_public import BinancePublicClient
@@ -8,6 +10,15 @@ def test_dashboard_has_25_unique_usdt_symbols() -> None:
     assert len(DASHBOARD_SYMBOLS) == 25
     assert len(set(DASHBOARD_SYMBOLS)) == 25
     assert all(symbol.endswith("USDT") for symbol in DASHBOARD_SYMBOLS)
+
+
+def test_dashboard_uses_websocket_with_safe_fallbacks() -> None:
+    html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    assert "new WebSocket(MARKET_STREAM_URL)" in html
+    assert "@miniTicker" in html
+    assert "scheduled rotation" in html
+    assert "loadBrowserMarket" in html
+    assert "getJson('/api/market/tickers', 4500)" in html
 
 
 @pytest.mark.asyncio

@@ -150,10 +150,10 @@
       </section>
 
       <div id="overviewView" class="view active">
-        <div class="feed-note"><strong>مصدر الأسعار:</strong> Binance public market data. الأسعار ليست أوامر تنفيذ، ويتم تحديثها تلقائيًا كل 15 ثانية. القائمة تتضمن 25 زوجًا من أزواج USDT.</div>
+        <div class="feed-note"><strong>مصدر الأسعار:</strong> Binance public market data عبر WebSocket للتحديث اللحظي، مع fallback REST عند الانقطاع. الأسعار ليست أوامر تنفيذ، والقائمة تتضمن 25 زوجًا من أزواج USDT.</div>
         <div class="grid">
           <section class="panel">
-            <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">آخر سعر من Binance، مع التغير والنطاق عندما تسمح واجهة السوق العامة.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
+            <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">أسعار لحظية عبر WebSocket؛ التغير والنطاق يظهران عند توفر بيانات REST العامة.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
             <div class="toolbar"><input id="marketSearch" class="field" type="search" placeholder="ابحث عن زوج مثل BTC أو SOL" aria-label="البحث في السوق" /></div>
             <div id="marketBox" class="table-wrap"></div>
           </section>
@@ -202,6 +202,47 @@
     const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
     async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const response = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
+
+    let marketSocket = null;
+    let marketReconnectTimer = null;
+    let marketRotationTimer = null;
+    let marketReconnectAttempt = 0;
+    const MARKET_STREAM_URL = 'wss://stream.binance.com:443/stream?streams=' + DASHBOARD_SYMBOLS.map((symbol) => `${symbol.toLowerCase()}@miniTicker`).join('/');
+
+    function connectMarketSocket() {
+      if (!window.WebSocket || (marketSocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(marketSocket.readyState))) return;
+      clearTimeout(marketReconnectTimer);
+      const socket = new WebSocket(MARKET_STREAM_URL);
+      marketSocket = socket;
+      setText('marketUpdated', 'WebSocket · جارٍ الاتصال');
+      socket.onopen = () => {
+        marketReconnectAttempt = 0;
+        setText('marketUpdated', 'WebSocket · متصل');
+        clearTimeout(marketRotationTimer);
+        marketRotationTimer = setTimeout(() => socket.close(1000, 'scheduled rotation'), 23 * 60 * 60 * 1000);
+      };
+      socket.onmessage = (event) => {
+        try {
+          const packet = JSON.parse(event.data);
+          const item = packet.data || packet;
+          if (item.e !== '24hrMiniTicker' || !item.s || item.c === undefined) return;
+          const normalized = { symbol: String(item.s).toUpperCase(), price: item.c, change_percent: null, high: item.h ?? null, low: item.l ?? null, volume: item.v ?? null, quote_volume: item.q ?? null, updated_at_ms: Number(item.E || Date.now()) };
+          const index = state.tickers.findIndex((ticker) => ticker.symbol === normalized.symbol);
+          if (index === -1) state.tickers.push(normalized); else state.tickers[index] = { ...state.tickers[index], ...normalized };
+          setText('marketUpdated', `WebSocket · ${fmtTime(normalized.updated_at_ms)}`);
+          renderMarket();
+        } catch (error) { /* Ignore malformed public market packets. */ }
+      };
+      socket.onerror = () => socket.close();
+      socket.onclose = () => {
+        if (marketSocket !== socket) return;
+        marketSocket = null;
+        clearTimeout(marketRotationTimer);
+        setText('marketUpdated', 'WebSocket · إعادة الاتصال');
+        const delay = Math.min(30000, 1000 * (2 ** Math.min(marketReconnectAttempt++, 5)));
+        marketReconnectTimer = setTimeout(connectMarketSocket, delay);
+      };
+    }
 
     function renderMarket() {
       const query = ($('marketSearch')?.value || '').trim().toUpperCase();
@@ -259,14 +300,16 @@
       throw lastError || new Error('Browser market fallback failed');
     }
     async function loadMarket() {
+      connectMarketSocket();
+      if (marketSocket?.readyState === WebSocket.OPEN && state.tickers.length) return;
       try {
         const data = await getJson('/api/market/tickers', 4500);
-        state.tickers = data.data || [];
-        setText('marketUpdated', `تحديث ${fmtTime(data.updated_at_ms)}`);
+        if (data.data?.length) state.tickers = data.data;
+        if (!marketSocket || marketSocket.readyState !== WebSocket.OPEN) setText('marketUpdated', `REST fallback · ${fmtTime(data.updated_at_ms)}`);
         renderMarket();
       } catch (error) {
         try { await loadBrowserMarket(); }
-        catch (browserError) { $('marketBox').innerHTML = '<div class="error-box">تعذر جلب بيانات Binance العامة حاليًا. ستتم المحاولة تلقائيًا.</div>'; }
+        catch (browserError) { if (!state.tickers.length) $('marketBox').innerHTML = '<div class="error-box">تعذر جلب بيانات Binance العامة حاليًا. ستتم المحاولة تلقائيًا.</div>'; }
       }
     }
     async function loadDecisions() {
