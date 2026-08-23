@@ -161,7 +161,7 @@ async def lifespan(_: FastAPI):
             )
             await telegram_bot.startup(settings.public_base_url)
         except Exception as error:
-            if telegram_bot:
+            if telegram_bot and not telegram_bot.startup_error:
                 telegram_bot.startup_error = type(error).__name__
             logger.error("Telegram bot startup failed error_type=%s", type(error).__name__)
 
