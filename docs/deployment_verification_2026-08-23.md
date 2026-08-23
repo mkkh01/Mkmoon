@@ -47,3 +47,7 @@
 ## حالة Render النهائية
 
 أظهرت صفحة Events الصحيحة للخدمة أن deploy `008e52c` أصبح `live` في 11:51 بتاريخ 23 أغسطس 2026. الخدمة الحالية هي Web Service واحد، ولا يوجد Background Worker موازٍ في Render حسب المشروع الفعلي، وهو متوافق مع قرار تشغيل Paper Worker داخل webserver.
+
+## فحص schema النهائي
+
+فحص `information_schema.columns` في Supabase أكد وجود عقود Paper المطلوبة: `paper_accounts` مع cash/equity/reserved/realized PnL، و`paper_orders` مع requested/filled/average fill/fees، و`paper_fills`، و`paper_positions` مع entry/stop/target/exit، و`risk_reservations`. جميع قراءات الفحص كانت read-only وبـ`LIMIT` صريح، ولم تُنشأ صفقة أو تُغيّر بيانات تشغيلية.
