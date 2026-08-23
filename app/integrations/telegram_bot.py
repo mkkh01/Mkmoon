@@ -122,19 +122,27 @@ class TelegramBot:
         return body
 
     async def startup(self, public_base_url: str) -> None:
-        me = await self._api("getMe", {})
+        try:
+            me = await self._api("getMe", {})
+        except Exception as error:
+            self.startup_error = f"getMe_{type(error).__name__}"
+            raise
         username = (me.get("result") or {}).get("username", "unknown")
         webhook_url = public_base_url.rstrip("/") + "/telegram/webhook"
-        await self._api(
-            "setWebhook",
-            {
-                "url": webhook_url,
-                "secret_token": self.webhook_secret,
-                "allowed_updates": ["message", "callback_query"],
-                "max_connections": 5,
-                "drop_pending_updates": False,
-            },
-        )
+        try:
+            await self._api(
+                "setWebhook",
+                {
+                    "url": webhook_url,
+                    "secret_token": self.webhook_secret,
+                    "allowed_updates": ["message", "callback_query"],
+                    "max_connections": 5,
+                    "drop_pending_updates": False,
+                },
+            )
+        except Exception as error:
+            self.startup_error = f"setWebhook_{type(error).__name__}"
+            raise
         self.started = True
         self.startup_error = None
         log.info("Telegram webhook configured bot=%s", username)
