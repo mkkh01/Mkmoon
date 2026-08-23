@@ -1,14 +1,7 @@
 # Render current state
 
-Checked on 2026-08-23.
+The authenticated Render dashboard contains the `Mkmoon` web service in `My project / Production`, linked to `mkkh01/Mkmoon` on `main`.
 
-- Workspace: Mk's workspace
-- Project: My project
-- Environment: Production
-- Web service: Mkmoon
-- Service ID: srv-da4s9ljncjis73ev3hjg
-- Repository: mkkh01/Mkmoon, branch main
-- Public URL shown by Render: https://mkmoon.onrender.com
-- Current Render page: web service overview
-- Recent deployments for commits through `fa94bdc` show build failure with exit status 1. The failure log must be opened before attempting another deploy.
-- No secret values are recorded in this file.
+Deployment `dep-da5aohm7bikc73bhgmng` for commit `db3fd11` was opened after the repository added `requirements.txt`. The service overview reported exit status 2 while running the code. The deployment detail was reopened, but its log panel remained in a loading state during the last browser observation; the exact runtime error is not yet recorded.
+
+No secret values were entered or recorded during this inspection.
