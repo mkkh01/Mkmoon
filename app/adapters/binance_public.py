@@ -101,10 +101,19 @@ class BinancePublicClient:
         params = {"symbols": json.dumps(normalized, separators=(",", ":"))}
         try:
             payload = await self._get(f"{self.data_base_url}/api/v3/ticker/24hr", params)
-        except RuntimeError:
-            # Some hosted egress IPs receive Binance 418 on the heavier 24hr route.
-            # The latest-price route is public, lighter, and is enough for a live quote.
-            payload = await self._get(f"{self.data_base_url}/api/v3/ticker/price", params)
+        except RuntimeError as primary_error:
+            # Some hosted egress IPs receive Binance 418 on data-api.vision.
+            # Try the lighter public price route, then the configured API host.
+            payload = None
+            last_error: RuntimeError = primary_error
+            for base_url in dict.fromkeys((self.data_base_url, self.base_url)):
+                try:
+                    payload = await self._get(f"{base_url}/api/v3/ticker/price", params)
+                    break
+                except RuntimeError as exc:
+                    last_error = exc
+            if payload is None:
+                raise last_error
             if isinstance(payload, dict):
                 payload = [payload]
             allowed = set(normalized)
