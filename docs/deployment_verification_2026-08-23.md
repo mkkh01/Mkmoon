@@ -61,3 +61,26 @@
 ## تحقق نطاق 25 أثناء إعادة التصميم
 
 بعد deploy `bd6625c` أصبح كود Dashboard وتشخيص الاستراتيجيات Live، لكن smoke test ظل يعيد `worker_symbols=3`؛ لذلك لم أعتبر المشكلة محلولة من الكود وحده. تم فتح Environment في Render وتحرير متغير `SYMBOLS` غير السري بالقائمة الكاملة ذات 25 زوجًا بعد التحقق من أن Binance.US يعيد `missing=[]`. بدأت Render إعادة deploy بسبب تحديث Environment عند 12:25، وما زال التحقق النهائي ينتظر دورة جديدة بعد اكتمالها.
+
+
+## تحقق Dashboard و25 رمزًا بعد الإصلاح الأخير
+
+بعد تصحيح Environment الفعلية في Render وتطبيق commit `bd6625c` ثم إصلاح تحويل JSONB في `320d756` وإضافة Score التغطية في `1f63809`، أثبت التحقق الخارجي ما يلي:
+
+| الفحص | النتيجة |
+| --- | --- |
+| `dashboard_symbols` | 25 |
+| `worker_symbols` | 25 |
+| `symbols_requested` في أحدث دورة مكتملة | 25 |
+| `symbols_processed` | 25 |
+| `decisions_count` | 25 |
+| `error_count` | 0 |
+| `diagnostic_symbol_count` | 25 |
+| الرموز التي تحتوي 4 استراتيجيات | 25 |
+| نوع `run.summary` في API | كائن JSON بعد إصلاح JSONB |
+| Score التغطية | موجود لكل استراتيجية، مع `score_basis=condition_coverage` |
+| Paper/live guard | `trading_mode=paper` و`live_trading_enabled=false` |
+
+العينة الإنتاجية أظهرت مثلًا للاستراتيجية `TREND_PULLBACK`: تسعة شروط ناجحة من عشرة وScore تغطية `90/100`، ولـ`BREAKOUT_RETEST`: ستة من ثمانية وScore `75/100`. هذا Score هو تغطية الشروط التشخيصية، وليس Quality Score لمرشح مكتمل؛ لذلك يظل `quality_score` فارغًا عندما تكون حالة الرمز WATCH ولا يوجد setup مكتمل.
+
+كما تم فحص HTML الإنتاجي وظهرت فيه عناوين `تشخيص كل رمز واستراتيجية` و`Score التغطية` و`السوق — 25 زوجًا` و`ملخص الدورات والتدقيق`. الاختبارات المحلية الأخيرة: `28 passed, 1 skipped`، وJavaScript syntax check ناجح.
