@@ -106,7 +106,15 @@ class BinancePublicClient:
             # Try the lighter public price route, then the configured API host.
             payload = None
             last_error: RuntimeError = primary_error
-            for base_url in dict.fromkeys((self.data_base_url, self.base_url)):
+            fallback_hosts = (
+                self.data_base_url,
+                self.base_url,
+                "https://api1.binance.com",
+                "https://api2.binance.com",
+                "https://api3.binance.com",
+                "https://api4.binance.com",
+            )
+            for base_url in dict.fromkeys(host.rstrip("/") for host in fallback_hosts):
                 try:
                     payload = await self._get(f"{base_url}/api/v3/ticker/price", params)
                     break
