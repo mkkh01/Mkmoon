@@ -40,13 +40,23 @@ class BinancePublicClient:
                 await asyncio.sleep(0.5 * (2**attempt))
         raise RuntimeError(f"Binance request failed: {last_error}")
 
+    async def _get_public(self, path: str, params: dict[str, Any] | None = None, preferred_base: str | None = None) -> Any:
+        candidates = [preferred_base, self.data_base_url, self.base_url, "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
+        last_error: RuntimeError | None = None
+        for base_url in dict.fromkeys(base.rstrip("/") for base in candidates if base):
+            try:
+                return await self._get(f"{base_url}{path}", params)
+            except RuntimeError as exc:
+                last_error = exc
+        raise last_error or RuntimeError("Binance public request failed")
+
     async def server_time_ms(self) -> int:
-        payload = await self._get(f"{self.base_url}/api/v3/time")
+        payload = await self._get_public("/api/v3/time", preferred_base=self.base_url)
         return int(payload["serverTime"])
 
     async def exchange_info(self, symbols: list[str]) -> dict[str, ExchangeSymbolFilters]:
         symbols_json = json.dumps(symbols, separators=(",", ":"))
-        payload = await self._get(f"{self.base_url}/api/v3/exchangeInfo", {"symbols": symbols_json})
+        payload = await self._get_public("/api/v3/exchangeInfo", {"symbols": symbols_json}, preferred_base=self.base_url)
         snapshot_time = int(time.time() * 1000)
         result: dict[str, ExchangeSymbolFilters] = {}
         for item in payload.get("symbols", []):
@@ -71,9 +81,10 @@ class BinancePublicClient:
         if not 1 <= limit <= 1000:
             raise ValueError("Binance kline limit must be between 1 and 1000")
         decision_time_ms = decision_time_ms or await self.server_time_ms()
-        raw = await self._get(
-            f"{self.data_base_url}/api/v3/klines",
+        raw = await self._get_public(
+            "/api/v3/klines",
             {"symbol": symbol, "interval": interval, "limit": limit, "endTime": decision_time_ms},
+            preferred_base=self.data_base_url,
         )
         candles: list[Candle] = []
         for row in raw:
@@ -162,5 +173,5 @@ class BinancePublicClient:
         return result
 
     async def ping(self) -> bool:
-        await self._get(f"{self.base_url}/api/v3/ping")
+        await self._get_public("/api/v3/ping", preferred_base=self.base_url)
         return True

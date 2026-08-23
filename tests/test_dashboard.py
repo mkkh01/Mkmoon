@@ -62,6 +62,31 @@ async def test_ticker_prices_falls_back_to_lightweight_endpoint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_public_worker_requests_fall_back_to_data_host() -> None:
+    client = BinancePublicClient("https://api.binance.com", "https://data-api.binance.vision")
+    calls: list[str] = []
+
+    async def fake_get(url: str, params: dict | None = None):
+        calls.append(url)
+        if url == "https://api.binance.com/api/v3/time":
+            raise RuntimeError("418")
+        if url == "https://data-api.binance.vision/api/v3/time":
+            return {"serverTime": 123456}
+        raise AssertionError(url)
+
+    client._get = fake_get  # type: ignore[method-assign]
+    try:
+        assert await client.server_time_ms() == 123456
+    finally:
+        await client.aclose()
+
+    assert calls[:2] == [
+        "https://api.binance.com/api/v3/time",
+        "https://data-api.binance.vision/api/v3/time",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_ticker_prices_normalizes_public_response() -> None:
     client = BinancePublicClient("https://api.binance.com", "https://data-api.binance.vision")
 
