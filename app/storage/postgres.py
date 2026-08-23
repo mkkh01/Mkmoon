@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import ssl
 from typing import Iterable
 
 import asyncpg
@@ -13,9 +15,32 @@ class PostgresStore:
         self.database_url = database_url
         self.pool: asyncpg.Pool | None = None
 
+    def _ssl_option(self):
+        """Return an explicit TLS policy for asyncpg.
+
+        Supabase pooler certificates may fail Render's default certificate-chain
+        verification in some regions. ``require`` keeps transport encrypted;
+        operators can opt into strict verification with ``verify-full`` and a
+        CA bundle supplied through ``PGSSLROOTCERT``.
+        """
+        if "supabase" not in self.database_url.lower():
+            return None
+        mode = os.getenv("DATABASE_SSL_MODE", "require").strip().lower()
+        if mode == "require":
+            return "require"
+        if mode == "verify-full":
+            cafile = os.getenv("PGSSLROOTCERT") or None
+            return ssl.create_default_context(cafile=cafile)
+        raise ValueError("DATABASE_SSL_MODE must be require or verify-full")
+
     async def connect(self) -> None:
-        use_tls = "supabase" in self.database_url.lower()
-        self.pool = await asyncpg.create_pool(self.database_url, ssl=True if use_tls else None, min_size=1, max_size=5, command_timeout=10)
+        self.pool = await asyncpg.create_pool(
+            self.database_url,
+            ssl=self._ssl_option(),
+            min_size=1,
+            max_size=5,
+            command_timeout=10,
+        )
 
     async def close(self) -> None:
         if self.pool:
