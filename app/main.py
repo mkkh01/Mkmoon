@@ -21,7 +21,11 @@ from app.storage.redis import RedisStore
 settings = get_settings()
 postgres = PostgresStore(settings.database_url) if settings.database_url else None
 redis_store = RedisStore(settings.redis_url) if settings.redis_url else None
-binance_public = BinancePublicClient(settings.binance_base_url, settings.binance_data_base_url)
+binance_public = BinancePublicClient(
+    settings.binance_base_url,
+    settings.binance_data_base_url,
+    fallback_base_url=settings.binance_fallback_base_url,
+)
 DASHBOARD_PATH = Path(__file__).with_name("static") / "index.html"
 DASHBOARD_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT",

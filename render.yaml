@@ -36,6 +36,8 @@ services:
         value: https://api.binance.com
       - key: BINANCE_DATA_BASE_URL
         value: https://data-api.binance.vision
+      - key: BINANCE_FALLBACK_BASE_URL
+        value: https://api.binance.us
       - key: RISK_PCT
         value: "0.0025"
       - key: MAX_DAILY_RISK_PCT
@@ -78,6 +80,8 @@ services:
         value: https://api.binance.com
       - key: BINANCE_DATA_BASE_URL
         value: https://data-api.binance.vision
+      - key: BINANCE_FALLBACK_BASE_URL
+        value: https://api.binance.us
       - key: RISK_PCT
         value: "0.0025"
       - key: MAX_DAILY_RISK_PCT

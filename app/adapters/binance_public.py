@@ -12,9 +12,11 @@ from app.core.models import Candle, ExchangeSymbolFilters
 
 
 class BinancePublicClient:
-    def __init__(self, base_url: str, data_base_url: str, timeout_seconds: float = 10.0):
+    def __init__(self, base_url: str, data_base_url: str, timeout_seconds: float = 10.0, fallback_base_url: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.data_base_url = data_base_url.rstrip("/")
+        self.fallback_base_url = fallback_base_url.rstrip("/") if fallback_base_url else None
+        self.last_public_base_url: str | None = None
         self.client = httpx.AsyncClient(timeout=timeout_seconds, headers={"User-Agent": "mkmoon/0.1"})
 
     async def aclose(self) -> None:
@@ -41,11 +43,13 @@ class BinancePublicClient:
         raise RuntimeError(f"Binance request failed: {last_error}")
 
     async def _get_public(self, path: str, params: dict[str, Any] | None = None, preferred_base: str | None = None) -> Any:
-        candidates = [preferred_base, self.data_base_url, self.base_url, "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
+        candidates = [preferred_base, self.data_base_url, self.base_url, self.fallback_base_url, "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
         last_error: RuntimeError | None = None
         for base_url in dict.fromkeys(base.rstrip("/") for base in candidates if base):
             try:
-                return await self._get(f"{base_url}{path}", params)
+                result = await self._get(f"{base_url}{path}", params)
+                self.last_public_base_url = base_url
+                return result
             except RuntimeError as exc:
                 last_error = exc
         raise last_error or RuntimeError("Binance public request failed")
@@ -124,8 +128,9 @@ class BinancePublicClient:
                 "https://api2.binance.com",
                 "https://api3.binance.com",
                 "https://api4.binance.com",
+                self.fallback_base_url,
             )
-            for base_url in dict.fromkeys(host.rstrip("/") for host in fallback_hosts):
+            for base_url in dict.fromkeys(host.rstrip("/") for host in fallback_hosts if host):
                 try:
                     payload = await self._get(f"{base_url}/api/v3/ticker/price", params)
                     break

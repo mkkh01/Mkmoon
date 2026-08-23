@@ -43,7 +43,11 @@ async def run_once() -> None:
     symbols = settings.symbol_list()
     cycle_id = f"cycle-{int(time.time() * 1000)}-{uuid.uuid4().hex[:10]}"
     started_at_ms = int(time.time() * 1000)
-    client = BinancePublicClient(settings.binance_base_url, settings.binance_data_base_url)
+    client = BinancePublicClient(
+        settings.binance_base_url,
+        settings.binance_data_base_url,
+        fallback_base_url=settings.binance_fallback_base_url,
+    )
     postgres = PostgresStore(settings.database_url) if settings.database_url else None
     redis_store = RedisStore(settings.redis_url) if settings.redis_url else None
     db_ready = False

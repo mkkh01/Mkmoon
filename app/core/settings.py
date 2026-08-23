@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     binance_base_url: str = "https://api.binance.com"
     binance_data_base_url: str = "https://data-api.binance.vision"
+    binance_fallback_base_url: str | None = None
     binance_ws_base_url: str = "wss://stream.binance.com:9443/ws"
     binance_api_key: str | None = None
     binance_api_secret: str | None = None
