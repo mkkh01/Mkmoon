@@ -12,6 +12,25 @@ import asyncpg
 from app.core.models import Candle, Decision
 
 
+def _decode_jsonb(value):
+    if isinstance(value, (bytes, bytearray)):
+        value = value.decode("utf-8")
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
+def _decode_row_json(row: dict, fields: tuple[str, ...]) -> dict:
+    result = dict(row)
+    for field in fields:
+        if field in result:
+            result[field] = _decode_jsonb(result[field])
+    return result
+
+
 class PostgresStore:
     def __init__(self, database_url: str):
         self.database_url = database_url
@@ -111,7 +130,7 @@ class PostgresStore:
                 limit,
                 search,
             )
-        return [dict(row) for row in rows]
+        return [_decode_row_json(dict(row), ("payload",)) for row in rows]
 
     async def recent_paper_orders(
         self,
@@ -615,7 +634,7 @@ class PostgresStore:
                 limit,
                 search,
             )
-        return [dict(row) for row in rows]
+        return [_decode_row_json(dict(row), ("summary",)) for row in rows]
 
     async def cycle_detail(self, cycle_id: str, event_limit: int = 1000) -> dict | None:
         pool = self._require_pool()
@@ -647,4 +666,7 @@ class PostgresStore:
                 cycle_id,
                 event_limit,
             )
-        return {"run": dict(run), "events": [dict(event) for event in events]}
+        return {
+            "run": _decode_row_json(dict(run), ("summary",)),
+            "events": [_decode_row_json(dict(event), ("reason_codes", "metrics")) for event in events],
+        }
