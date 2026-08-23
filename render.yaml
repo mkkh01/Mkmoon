@@ -36,6 +36,14 @@ services:
         sync: false
       - key: DASHBOARD_ACCESS_TOKEN
         sync: false
+      - key: PUBLIC_BASE_URL
+        value: https://mkmoon.onrender.com
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_ALLOWED_CHAT_IDS
+        sync: false
       - key: SYMBOLS
         value: BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT
       - key: BINANCE_BASE_URL

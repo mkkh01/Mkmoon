@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.adapters.binance_public import BinancePublicClient
 from app.core.settings import get_settings
+from app.integrations.telegram_bot import TelegramBot
 from app.storage.postgres import PostgresStore
 from app.storage.redis import RedisStore
 
@@ -92,10 +93,49 @@ paper_worker_state: dict[str, object] = {
     "last_cycle_symbols_requested": len(settings.symbol_list()),
     "last_cycle_symbols_processed": 0,
 }
+telegram_bot: TelegramBot | None = None
+
+
+async def _telegram_get_summary() -> dict:
+    return await dashboard_summary()
+
+
+async def _telegram_get_cycle() -> dict | None:
+    if postgres is None or postgres.pool is None:
+        return None
+    rows = await postgres.recent_cycles(limit=100)
+    selected = next((row for row in rows if row.get("status") == "COMPLETED"), None)
+    selected = selected or next((row for row in rows if row.get("status") in {"PARTIAL", "FAILED"}), None)
+    if not selected:
+        return None
+    return await postgres.cycle_detail(str(selected["cycle_id"]))
+
+
+async def _telegram_get_decisions() -> list[dict]:
+    if postgres is None or postgres.pool is None:
+        return []
+    return await postgres.recent_decisions(limit=100)
+
+
+async def _telegram_get_orders() -> list[dict]:
+    if postgres is None or postgres.pool is None:
+        return []
+    return await postgres.recent_paper_orders(limit=100)
+
+
+async def _telegram_get_cycles() -> list[dict]:
+    if postgres is None or postgres.pool is None:
+        return []
+    return await postgres.recent_cycles(limit=100)
+
+
+async def _telegram_get_logs() -> list[dict]:
+    return log_buffer.snapshot(limit=200)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global telegram_bot
     logger.info("Starting Mkmoon API in %s mode", settings.trading_mode)
     if postgres:
         await postgres.connect()
@@ -104,6 +144,24 @@ async def lifespan(_: FastAPI):
         await redis_store.connect()
         logger.info("Redis connection established")
     logger.info("Paper-only guard active; live trading enabled=%s", settings.live_trading_enabled)
+
+    if settings.telegram_bot_token:
+        try:
+            telegram_bot = TelegramBot(
+                settings.telegram_bot_token,
+                webhook_secret=settings.telegram_webhook_secret,
+                allowed_chat_ids=settings.telegram_chat_ids(),
+                dashboard_url=settings.public_base_url,
+                get_summary=_telegram_get_summary,
+                get_cycle=_telegram_get_cycle,
+                get_decisions=_telegram_get_decisions,
+                get_orders=_telegram_get_orders,
+                get_cycles=_telegram_get_cycles,
+                get_logs=_telegram_get_logs,
+            )
+            await telegram_bot.startup(settings.public_base_url)
+        except Exception:
+            logger.exception("Telegram bot startup failed; HTTP service remains available")
 
     paper_task: asyncio.Task | None = None
     paper_enabled = settings.trading_mode == "paper" and not settings.live_trading_enabled
@@ -163,6 +221,9 @@ async def lifespan(_: FastAPI):
             paper_worker_state["running"] = False
             paper_worker_state["last_cycle_status"] = "STOPPED"
             logger.info("Embedded Paper worker stopped")
+        if telegram_bot:
+            await telegram_bot.close()
+            telegram_bot = None
         await binance_public.aclose()
         if redis_store:
             await redis_store.close()
@@ -183,6 +244,23 @@ async def dashboard_api_guard(request: Request, call_next):
         if not token or not secrets.compare_digest(token, configured):
             return JSONResponse({"detail": "Dashboard API authentication required"}, status_code=401)
     return await call_next(request)
+
+
+@app.post("/telegram/webhook", include_in_schema=False)
+async def telegram_webhook(request: Request) -> dict[str, bool]:
+    if telegram_bot is None:
+        raise HTTPException(status_code=503, detail="Telegram bot is not configured")
+    supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    if not telegram_bot.verify_webhook_secret(supplied):
+        raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
+    try:
+        update = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON update") from exc
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Telegram update must be an object")
+    await telegram_bot.handle_update(update)
+    return {"ok": True}
 
 
 @app.get("/", include_in_schema=False)

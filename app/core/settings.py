@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     worker_lock_ttl_seconds: int = Field(default=600, ge=60, le=3600)
     config_path: str = "configs/config.v1.yaml"
     dashboard_access_token: str | None = None
+    public_base_url: str = "https://mkmoon.onrender.com"
+    telegram_bot_token: str | None = None
+    telegram_webhook_secret: str | None = None
+    telegram_allowed_chat_ids: str = ""
 
     @field_validator("trading_mode")
     @classmethod
@@ -62,6 +66,18 @@ class Settings(BaseSettings):
 
     def symbol_list(self) -> list[str]:
         return self.symbols.split(",")
+
+    def telegram_chat_ids(self) -> set[int]:
+        result: set[int] = set()
+        for raw in self.telegram_allowed_chat_ids.split(","):
+            value = raw.strip()
+            if not value:
+                continue
+            try:
+                result.add(int(value))
+            except ValueError as exc:
+                raise ValueError("TELEGRAM_ALLOWED_CHAT_IDS must contain comma-separated integers") from exc
+        return result
 
     def assert_safe_mode(self) -> None:
         if self.trading_mode == "live" and not self.live_trading_enabled:
