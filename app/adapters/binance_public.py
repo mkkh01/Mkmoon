@@ -94,14 +94,34 @@ class BinancePublicClient:
         return candles
 
     async def ticker_prices(self, symbols: list[str]) -> list[dict[str, Any]]:
-        """Return public latest prices for an allow-listed symbol set."""
+        """Return public latest prices, with a lightweight endpoint fallback."""
         normalized = list(dict.fromkeys(symbol.strip().upper() for symbol in symbols if symbol.strip()))
         if not 1 <= len(normalized) <= 100:
             raise ValueError("ticker symbol count must be between 1 and 100")
-        payload = await self._get(
-            f"{self.data_base_url}/api/v3/ticker/24hr",
-            {"symbols": json.dumps(normalized, separators=(",", ":"))},
-        )
+        params = {"symbols": json.dumps(normalized, separators=(",", ":"))}
+        try:
+            payload = await self._get(f"{self.data_base_url}/api/v3/ticker/24hr", params)
+        except RuntimeError:
+            # Some hosted egress IPs receive Binance 418 on the heavier 24hr route.
+            # The latest-price route is public, lighter, and is enough for a live quote.
+            payload = await self._get(f"{self.data_base_url}/api/v3/ticker/price", params)
+            if isinstance(payload, dict):
+                payload = [payload]
+            allowed = set(normalized)
+            return [
+                {
+                    "symbol": str(item.get("symbol", "")).upper(),
+                    "price": str(item.get("price", "0")),
+                    "change_percent": None,
+                    "high": None,
+                    "low": None,
+                    "volume": None,
+                    "quote_volume": None,
+                    "updated_at_ms": None,
+                }
+                for item in payload
+                if str(item.get("symbol", "")).upper() in allowed
+            ]
         if isinstance(payload, dict):
             payload = [payload]
         allowed = set(normalized)

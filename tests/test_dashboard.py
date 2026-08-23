@@ -11,6 +11,32 @@ def test_dashboard_has_25_unique_usdt_symbols() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ticker_prices_falls_back_to_lightweight_endpoint() -> None:
+    client = BinancePublicClient("https://api.binance.com", "https://data-api.binance.vision")
+    calls: list[str] = []
+
+    async def fake_get(url: str, params: dict):
+        calls.append(url)
+        if url.endswith("/ticker/24hr"):
+            raise RuntimeError("418")
+        return [{"symbol": "BTCUSDT", "price": "70000.12"}]
+
+    client._get = fake_get  # type: ignore[method-assign]
+    try:
+        result = await client.ticker_prices(["BTCUSDT"])
+    finally:
+        await client.aclose()
+
+    assert calls == [
+        "https://data-api.binance.vision/api/v3/ticker/24hr",
+        "https://data-api.binance.vision/api/v3/ticker/price",
+    ]
+    assert result[0]["symbol"] == "BTCUSDT"
+    assert result[0]["price"] == "70000.12"
+    assert result[0]["change_percent"] is None
+
+
+@pytest.mark.asyncio
 async def test_ticker_prices_normalizes_public_response() -> None:
     client = BinancePublicClient("https://api.binance.com", "https://data-api.binance.vision")
 

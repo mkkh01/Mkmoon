@@ -196,8 +196,8 @@
     const $ = (id) => document.getElementById(id);
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
     const fmtTime = (ms) => ms ? new Date(Number(ms)).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
-    const fmtPrice = (value) => { const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }); };
-    const fmtPct = (value) => { const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
+    const fmtPrice = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }); };
+    const fmtPct = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
     const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
     async function getJson(url) { const response = await fetch(url, { headers: { 'Accept': 'application/json' } }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }
