@@ -35,7 +35,7 @@ python -m app.worker
 
 عند تشغيل الخدمة، يفتح الرابط الأساسي صفحة Dashboard: `https://mkmoon.onrender.com/`. تعرض الصفحة حالة الخدمة وPostgreSQL وRedis، وأسعار 25 زوجًا من Binance USDT عبر بيانات عامة، وسجل القرارات، والصفقات الورقية المفتوحة والمغلقة، وسجل التطبيق مع البحث والتصفية. المسارات البرمجية المقابلة هي `/api/dashboard/summary` و`/api/market/tickers` و`/api/decisions` و`/api/paper-orders` و`/api/logs`.
 
-الأسعار مصدرها Binance public market data فقط، ولا تُستخدم لإرسال أوامر. تحاول الخدمة أولًا جلب الأسعار من backend؛ وإذا رفضت شبكة Render طلبات Binance العامة، تستخدم الواجهة fallback مباشرًا من متصفح المستخدم عبر مضيفات Binance العامة، مع تحديث دوري كل 15 ثانية. سجلات Render الكاملة تبقى في صفحة Logs داخل Render؛ أما `/api/logs` فيعرض سجل التطبيق الذي تجمعه الخدمة أثناء تشغيلها، مع إزالة عناوين الاتصال الحساسة من الرسائل.
+الأسعار مصدرها Binance public market data فقط، ولا تُستخدم لإرسال أوامر. تستخدم Dashboard اتصال WebSocket واحدًا لـ25 miniTicker streams للتحديث اللحظي، مع reconnect وheartbeat ودوران دوري قبل حد Binance، وتستخدم REST fallback عند الانقطاع. وإذا رفضت شبكة Render طلبات Binance العامة، تستخدم الواجهة fallback مباشرًا من متصفح المستخدم. سجلات Render الكاملة تبقى في صفحة Logs داخل Render؛ أما `/api/logs` فيعرض سجل التطبيق الذي تجمعه الخدمة أثناء تشغيلها، مع إزالة عناوين الاتصال الحساسة من الرسائل.
 
 ## Render
 
