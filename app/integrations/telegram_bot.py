@@ -83,6 +83,7 @@ class TelegramBot:
         self.get_logs = get_logs
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
         self._dispatch_limit = asyncio.Semaphore(2)
+        self.started = False
 
     @property
     def configured(self) -> bool:
@@ -128,6 +129,7 @@ class TelegramBot:
                 "drop_pending_updates": False,
             },
         )
+        self.started = True
         log.info("Telegram webhook configured bot=%s", username)
 
     async def _send(self, chat_id: int, text: str, reply_markup: dict | None = None) -> None:

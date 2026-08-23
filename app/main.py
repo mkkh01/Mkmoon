@@ -268,6 +268,17 @@ def dashboard() -> FileResponse:
     return FileResponse(DASHBOARD_PATH, media_type="text/html")
 
 
+@app.get("/telegram/health", include_in_schema=False)
+def telegram_health() -> dict:
+    return {
+        "configured": bool(settings.telegram_bot_token),
+        "started": bool(telegram_bot and telegram_bot.started),
+        "allowed_chat_ids_configured": bool(settings.telegram_allowed_chat_ids.strip()),
+        "webhook_path": "/telegram/webhook",
+        "read_only": True,
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     return {
