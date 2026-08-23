@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from app.core.models import Candle, Decision, DecisionStatus, RiskPlan
 from app.engine.paper import simulate_long_entry, simulate_long_exit
+from app.worker import _first_exit_fill
 
 
 def _decision() -> Decision:
@@ -45,3 +46,24 @@ def test_paper_exit_is_conservative_and_net_of_fee() -> None:
     assert result.exit_reason == "STOP_AND_TARGET_SAME_CANDLE_CONSERVATIVE_STOP"
     assert result.fill_price == Decimal("99")
     assert result.realized_pnl < Decimal("0")
+
+
+def test_worker_exit_uses_first_hit_between_cycles() -> None:
+    missed_if_latest_only = Candle(
+        symbol="BTCUSDT", timeframe="5m", open_time_ms=3, close_time_ms=4,
+        open=Decimal("100"), high=Decimal("101"), low=Decimal("99.5"), close=Decimal("100.2"),
+        volume=Decimal("10"), is_closed=True,
+    )
+    earlier_target = Candle(
+        symbol="BTCUSDT", timeframe="5m", open_time_ms=1, close_time_ms=2,
+        open=Decimal("100"), high=Decimal("102.5"), low=Decimal("99.5"), close=Decimal("101.5"),
+        volume=Decimal("10"), is_closed=True,
+    )
+    exit_time_ms, fill = _first_exit_fill(
+        [missed_if_latest_only, earlier_target], entry_price=Decimal("100"),
+        stop_price=Decimal("99"), target_price=Decimal("102"), quantity=Decimal("0.1"),
+        fee_rate=Decimal("0.001"),
+    )
+    assert exit_time_ms == 2
+    assert fill is not None
+    assert fill.exit_reason == "TAKE_PROFIT"

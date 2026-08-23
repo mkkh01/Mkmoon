@@ -118,6 +118,12 @@ async def lifespan(_: FastAPI):
                 paper_worker_state["last_cycle_started_at_ms"] = int(started * 1000)
                 paper_worker_state["last_cycle_status"] = "RUNNING"
                 paper_worker_state["last_cycle_error"] = None
+                paper_worker_state["last_cycle_id"] = None
+                paper_worker_state["last_cycle_duration_ms"] = None
+                paper_worker_state["last_cycle_data_source"] = None
+                paper_worker_state["last_cycle_errors"] = []
+                paper_worker_state["last_cycle_symbols_requested"] = len(settings.symbol_list())
+                paper_worker_state["last_cycle_symbols_processed"] = 0
                 try:
                     result = await asyncio.wait_for(
                         run_once(postgres_store=postgres, redis_store=redis_store, client=binance_public),

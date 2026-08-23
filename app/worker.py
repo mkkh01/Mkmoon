@@ -66,6 +66,30 @@ def _data_source(client: BinancePublicClient, sources: set[str]) -> str:
     return ",".join(sorted(sources)) or "public_spot_rest_closed_klines"
 
 
+def _first_exit_fill(
+    candles: list,
+    *,
+    entry_price: Decimal,
+    stop_price: Decimal,
+    target_price: Decimal,
+    quantity: Decimal,
+    fee_rate: Decimal,
+):
+    """Return the first chronological closed-candle exit, if any."""
+    for candle in sorted(candles, key=lambda item: item.close_time_ms):
+        fill = simulate_long_exit_levels(
+            entry_price=entry_price,
+            stop_price=stop_price,
+            target_price=target_price,
+            quantity=quantity,
+            candle=candle,
+            fee_rate=fee_rate,
+        )
+        if fill.status == "CLOSED":
+            return candle.close_time_ms, fill
+    return None, None
+
+
 async def run_once(
     *,
     settings: Settings | None = None,
@@ -307,18 +331,21 @@ async def _run_cycle(
                                 if candle.close_time_ms > opened_at_ms
                             ]
                             if eligible_candles:
-                                last_candle = max(eligible_candles, key=lambda candle: candle.close_time_ms)
-                                exit_fill = simulate_long_exit_levels(
+                                # Evaluate every closed candle since entry in chronological order.
+                                # Checking only the latest candle can miss a stop/target hit that
+                                # occurred between two worker cycles and then reversed.
+                                exit_time_ms, exit_fill = _first_exit_fill(
+                                    eligible_candles,
                                     entry_price=Decimal(str(position["entry_price"])),
                                     stop_price=Decimal(str(position["stop_price"])),
                                     target_price=Decimal(str(position["target_price"])),
-                                    quantity=Decimal(str(position["quantity"])), candle=last_candle,
+                                    quantity=Decimal(str(position["quantity"])),
                                     fee_rate=Decimal(str(policy["risk"]["fee_rate"])),
                                 )
-                                if exit_fill.status == "CLOSED":
+                                if exit_fill is not None and exit_time_ms is not None:
                                     closed = await postgres.close_paper_position(
-                                        position, exit_fill, last_candle.close_time_ms,
-                                        {"data_source": _data_source(client, sources), "candle_time_ms": last_candle.close_time_ms},
+                                        position, exit_fill, exit_time_ms,
+                                        {"data_source": _data_source(client, sources), "candle_time_ms": exit_time_ms},
                                     )
                                     await emit("PAPER_EXIT", closed["status"], symbol=symbol,
                                                reason_codes=[exit_fill.exit_reason or "EXIT"], metrics=closed)
@@ -442,7 +469,7 @@ async def _run_cycle(
         stats["sources_seen"] = sorted(sources)
         if fatal or (stats["error_count"] > 0 and stats["decisions_count"] == 0):
             cycle_status = "FAILED"
-        elif stats["error_count"] == 0 and stats["symbols_failed"] == 0 and stats["symbols_skipped"] == 0:
+        elif stats["error_count"] == 0 and stats["audit_write_errors"] == 0 and stats["symbols_failed"] == 0 and stats["symbols_skipped"] == 0:
             cycle_status = "COMPLETED"
         else:
             cycle_status = "PARTIAL"

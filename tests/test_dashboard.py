@@ -29,6 +29,13 @@ def test_dashboard_exposes_cycle_summary_timeline() -> None:
     assert "cycle_events" not in html  # browser must use API, not query the database directly
 
 
+def test_dashboard_uses_latest_completed_cycle_and_unambiguous_counts() -> None:
+    html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    assert "rows.find(row => row.status === 'COMPLETED')" in html
+    assert "تمت معالجة" in html
+    assert "حلّل ${data.worker_symbols" in html
+
+
 def test_cycle_audit_migration_has_run_and_event_contract() -> None:
     sql = (Path(__file__).parents[1] / "migrations" / "0005_cycle_audit.sql").read_text(encoding="utf-8")
     for required in ("create table if not exists cycle_runs", "create table if not exists cycle_events", "reason_codes jsonb", "error_message text"):

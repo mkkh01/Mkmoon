@@ -13,3 +13,11 @@ def test_decode_row_json_normalizes_only_declared_json_fields() -> None:
     assert result["cycle_id"] == "c1"
     assert result["status"] == "COMPLETED"
     assert result["summary"]["symbol_diagnostics"]["BTCUSDT"] == {}
+
+
+def test_paper_position_and_order_json_fields_are_decoded() -> None:
+    position = _decode_row_json({"payload": '{"risk_cash":"25"}'}, ("payload",))
+    order = _decode_row_json({"payload": '{"mode":"paper"}', "fills": '[{"fill_id":"f1"}]'}, ("payload", "fills"))
+    assert position["payload"]["risk_cash"] == "25"
+    assert order["payload"]["mode"] == "paper"
+    assert order["fills"][0]["fill_id"] == "f1"

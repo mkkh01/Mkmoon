@@ -222,7 +222,7 @@ class PostgresStore:
                 limit,
                 offset,
             )
-        return [dict(row) for row in rows]
+        return [_decode_row_json(dict(row), ("payload", "fills")) for row in rows]
 
     async def paper_order_counts(self) -> dict[str, int]:
         pool = self._require_pool()
@@ -289,7 +289,7 @@ class PostgresStore:
                 """,
                 symbol,
             )
-        return dict(row) if row else None
+        return _decode_row_json(dict(row), ("payload",)) if row else None
 
     async def create_paper_trade(self, decision: Decision, entry, data_source: str) -> dict:
         """Atomically reserve risk, create/fill a Paper BUY, and open one position."""
