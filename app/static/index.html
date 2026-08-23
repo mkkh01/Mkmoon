@@ -105,6 +105,16 @@
     .timestamp { direction: ltr; unicode-bidi: plaintext; }
     .log-level { font-size: 10px; font-weight: 700; }
     .loading { opacity: .55; }
+    .cycle-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .cycle-stat { border: 1px solid var(--line); border-radius: 11px; padding: 12px; background: rgba(7, 17, 31, .35); }
+    .cycle-stat strong { display: block; font-size: 17px; margin-top: 5px; }
+    .cycle-stat span { color: var(--muted); font-size: 11px; }
+    .cycle-ok { color: var(--green); }
+    .cycle-warn { color: var(--amber); }
+    .cycle-error { color: var(--red); }
+    .mono { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .cycle-detail { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+    @media (max-width: 760px) { .cycle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .footer { color: #6f829d; text-align: center; font-size: 11px; margin-top: 27px; }
     @media (max-width: 1120px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .grid { grid-template-columns: 1fr; } }
     @media (max-width: 760px) { .shell { display: block; } aside { position: static; height: auto; padding: 18px; border-left: 0; border-bottom: 1px solid var(--line); } .brand { margin-bottom: 20px; } .nav { display: flex; overflow-x: auto; padding-bottom: 2px; } .nav button { min-width: max-content; } .aside-note { display: none; } main { padding: 22px 14px 35px; } .topline { display: block; } .actions { margin-top: 16px; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric { min-height: 92px; } .metric-value { font-size: 20px; } .panel { padding: 15px; } }
@@ -123,6 +133,7 @@
         <button data-tab="orders"><span class="nav-icon">↔</span> الصفقات الورقية</button>
         <button data-tab="decisions"><span class="nav-icon">⌁</span> القرارات</button>
         <button data-tab="logs"><span class="nav-icon">▤</span> سجلات التطبيق</button>
+        <button data-tab="cycles"><span class="nav-icon">◌</span> ملخص الدورات</button>
       </nav>
       <div class="aside-note"><strong>وضع آمن مفعل</strong>هذه اللوحة للمتابعة والتحليل. لا يوجد زر يرسل أمرًا إلى Binance، والتنفيذ الحي معطل.</div>
     </aside>
@@ -180,6 +191,16 @@
         </section>
       </div>
 
+      <div id="cyclesView" class="view">
+        <section class="panel">
+          <div class="panel-head"><div><h3 class="panel-title">Cycle Summary — سجل دورة النظام</h3><p class="panel-desc">تسلسل قابل للتدقيق من بداية الدورة حتى القرار والتخزين وPaper execution، مع أسباب الإيقاف والأخطاء ومدد المراحل.</p></div><span class="panel-meta">آخر 200 دورة</span></div>
+          <div class="feed-note"><strong>كيف نقرأ الدورة؟</strong> كل صف دورة يلخص عدد الرموز والقرارات والأخطاء. افتح التفاصيل لرؤية timeline لكل رمز: التحقق، جلب الشموع المغلقة، بوابة Features، القرار، PostgreSQL، Redis، ثم سبب تخطي أو حظر Paper execution.</div>
+          <div class="toolbar"><input id="cycleSearch" class="field" type="search" placeholder="بحث برقم الدورة أو الحالة أو الوضع" aria-label="البحث في دورات التشغيل" /></div>
+          <div id="cyclesBox" class="table-wrap"></div>
+          <div id="cycleDetailBox" class="cycle-detail"></div>
+        </section>
+      </div>
+
       <div id="logsView" class="view">
         <section class="panel">
           <div class="panel-head"><div><h3 class="panel-title">سجلات التطبيق</h3><p class="panel-desc">سجل التشغيل الذي تجمعه الخدمة، مع فلترة المستوى والبحث النصي. سجلات Render الكاملة تبقى في لوحة Render.</p></div><span class="panel-meta">آخر 400 سجل</span></div>
@@ -200,6 +221,9 @@
     const fmtPrice = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }); };
     const fmtPct = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
     const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
+    const cycleStatusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = s === 'COMPLETED' ? 'badge-green' : ['PARTIAL','RUNNING'].includes(s) ? 'badge-amber' : s === 'FAILED' ? 'badge-red' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
+    const stageLabel = { CYCLE_START:'بدء الدورة', POSTGRES_CONNECT:'اتصال PostgreSQL', REDIS_CONNECT:'اتصال Redis', BINANCE_SERVER_TIME:'وقت Binance', EXCHANGE_INFO:'معلومات الأزواج', SYMBOL_VALIDATE:'تحقق الرمز', CANDLE_FETCH:'جلب الشموع المغلقة', FEATURE_GATE:'بوابة البيانات والميزات', DECISION_EVALUATE:'تقييم القرار', CANDLE_PERSIST:'حفظ الشموع', DECISION_PERSIST:'حفظ القرار', PERSISTENCE:'التخزين', REDIS_PUBLISH:'نشر Redis', PAPER_EXECUTION:'Paper execution', CYCLE_UNHANDLED:'خطأ غير معالج' };
+    const fmtDuration = (value) => value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-US')} ms`;
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
     async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const response = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
 
@@ -324,8 +348,32 @@
       try { const params = new URLSearchParams({ search: ($('logSearch')?.value || '').trim(), level: $('logLevel')?.value || '', limit: '200' }); renderLogs(await getJson(`/api/logs?${params}`)); }
       catch (error) { $('logsBox').innerHTML = '<div class="error-box">تعذر قراءة سجل التطبيق.</div>'; }
     }
-    async function refreshAll() { $('refreshBtn').classList.add('loading'); await Promise.allSettled([loadSummary(), loadMarket(), loadDecisions(), loadOrders(), loadLogs()]); setText('lastRefresh', new Date().toLocaleTimeString('ar-EG')); $('refreshBtn').classList.remove('loading'); }
-    function activateTab(tab) { document.querySelectorAll('.nav button').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab)); document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `${tab}View`)); if (tab === 'orders') loadOrders(); if (tab === 'decisions') loadDecisions(); if (tab === 'logs') loadLogs(); }
+    function renderCycles(items) {
+      if (!items?.length) { $('cyclesBox').innerHTML = '<div class="empty">لا توجد دورات مسجلة بعد. ستظهر هنا عند تشغيل Paper Worker.</div>'; $('cycleDetailBox').innerHTML = ''; return; }
+      $('cyclesBox').innerHTML = `<table><thead><tr><th>رقم الدورة</th><th>الحالة</th><th>بدأت</th><th>المدة</th><th>الرموز</th><th>القرارات</th><th>الأخطاء</th><th>تفاصيل</th></tr></thead><tbody>${items.map((item) => `<tr><td class="mono">${esc(item.cycle_id)}</td><td>${cycleStatusBadge(item.status)}</td><td>${fmtTime(item.started_at_ms)}</td><td>${fmtDuration(item.finished_at_ms && item.started_at_ms ? Number(item.finished_at_ms) - Number(item.started_at_ms) : null)}</td><td>${esc(item.symbols_processed ?? 0)} / ${esc(item.symbols_requested ?? 0)}</td><td>${esc(item.decisions_count ?? 0)}</td><td class="${Number(item.error_count) > 0 ? 'cycle-error' : ''}">${esc(item.error_count ?? 0)}</td><td><button class="btn cycle-open" data-cycle-id="${esc(item.cycle_id)}">فتح</button></td></tr>`).join('')}</tbody></table>`;
+      document.querySelectorAll('.cycle-open').forEach((button) => button.addEventListener('click', () => loadCycleDetail(button.dataset.cycleId)));
+      loadCycleDetail(items[0].cycle_id);
+    }
+    function renderCycleDetail(data) {
+      if (!data?.run) { $('cycleDetailBox').innerHTML = ''; return; }
+      const run = data.run;
+      const summary = run.summary || {};
+      const reasonCounts = summary.reason_counts || {};
+      const reasons = Object.entries(reasonCounts).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10).map(([key, value]) => `<span class="badge badge-amber">${esc(key)}: ${esc(value)}</span>`).join(' ') || '<span class="subtle">لا توجد أسباب مرفقة</span>';
+      const events = data.events || [];
+      const eventRows = events.map((event) => { const metrics = event.metrics || {}; const metricText = Object.entries(metrics).filter(([key, value]) => value !== null && value !== undefined && !['code_version','config_version'].includes(key)).slice(0, 4).map(([key, value]) => `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`).join(' · '); const error = event.error_type ? ` ${event.error_type}: ${event.error_message || ''}` : ''; return `<tr><td>${esc(event.sequence_id)}</td><td>${fmtTime(event.event_time_ms)}</td><td>${esc(event.symbol || '—')}</td><td>${esc(stageLabel[event.stage] || event.stage)}</td><td>${statusBadge(event.status)}</td><td>${fmtDuration(event.duration_ms)}</td><td class="subtle">${esc([...(event.reason_codes || []), metricText, error].filter(Boolean).join(' · ') || '—')}</td></tr>`; }).join('');
+      $('cycleDetailBox').innerHTML = `<div class="panel-head"><div><h3 class="panel-title">تفاصيل الدورة <span class="mono">${esc(run.cycle_id)}</span></h3><p class="panel-desc">${fmtTime(run.started_at_ms)} → ${fmtTime(run.finished_at_ms)} · code ${esc(run.code_version)} · config ${esc(run.config_version)}</p></div><div>${cycleStatusBadge(run.status)}</div></div><div class="cycle-grid"><div class="cycle-stat"><span>الرموز المعالجة</span><strong>${esc(run.symbols_processed)} / ${esc(run.symbols_requested)}</strong></div><div class="cycle-stat"><span>القرارات</span><strong>${esc(run.decisions_count)}</strong></div><div class="cycle-stat"><span>أوامر منشأة</span><strong>${esc(run.orders_created)}</strong></div><div class="cycle-stat"><span>الأخطاء</span><strong class="${Number(run.error_count) ? 'cycle-error' : 'cycle-ok'}">${esc(run.error_count)}</strong></div></div><p class="panel-desc"><strong>أكثر أسباب القرار:</strong> ${reasons}</p><div class="table-wrap"><table><thead><tr><th>#</th><th>الوقت</th><th>الرمز</th><th>المرحلة</th><th>النتيجة</th><th>المدة</th><th>الأسباب والمقاييس</th></tr></thead><tbody>${eventRows || '<tr><td colspan="7" class="empty">لا توجد أحداث للدورة.</td></tr>'}</tbody></table></div>`;
+    }
+    async function loadCycleDetail(cycleId) {
+      try { $('cycleDetailBox').innerHTML = '<div class="empty">جارٍ تحميل timeline…</div>'; renderCycleDetail(await getJson(`/api/cycles/${encodeURIComponent(cycleId)}`)); }
+      catch (error) { $('cycleDetailBox').innerHTML = '<div class="error-box">تعذر قراءة تفاصيل الدورة.</div>'; }
+    }
+    async function loadCycles() {
+      try { const params = new URLSearchParams({ search: ($('cycleSearch')?.value || '').trim(), limit: '200' }); renderCycles(await getJson(`/api/cycles?${params}`)); }
+      catch (error) { $('cyclesBox').innerHTML = '<div class="error-box">تعذر قراءة Cycle Summary. تأكد من تطبيق migration 0005.</div>'; }
+    }
+    async function refreshAll() { $('refreshBtn').classList.add('loading'); await Promise.allSettled([loadSummary(), loadMarket(), loadDecisions(), loadOrders(), loadLogs(), loadCycles()]); setText('lastRefresh', new Date().toLocaleTimeString('ar-EG')); $('refreshBtn').classList.remove('loading'); }
+    function activateTab(tab) { document.querySelectorAll('.nav button').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab)); document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === `${tab}View`)); if (tab === 'orders') loadOrders(); if (tab === 'decisions') loadDecisions(); if (tab === 'logs') loadLogs(); if (tab === 'cycles') loadCycles(); }
 
     document.querySelectorAll('.nav button').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.tab)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.go)));
@@ -336,9 +384,10 @@
     $('decisionSearch').addEventListener('input', loadDecisions);
     $('logSearch').addEventListener('input', loadLogs);
     $('logLevel').addEventListener('change', loadLogs);
+    $('cycleSearch').addEventListener('input', loadCycles);
     refreshAll();
     setInterval(() => { loadSummary(); loadMarket(); }, 15000);
-    setInterval(() => { loadOrders(); loadDecisions(); loadLogs(); }, 30000);
+    setInterval(() => { loadOrders(); loadDecisions(); loadLogs(); loadCycles(); }, 30000);
   </script>
 </body>
 </html>

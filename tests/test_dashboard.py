@@ -21,6 +21,20 @@ def test_dashboard_uses_websocket_with_safe_fallbacks() -> None:
     assert "getJson('/api/market/tickers', 4500)" in html
 
 
+def test_dashboard_exposes_cycle_summary_timeline() -> None:
+    html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="cyclesView"' in html
+    assert "loadCycles" in html
+    assert "/api/cycles/" in html
+    assert "cycle_events" not in html  # browser must use API, not query the database directly
+
+
+def test_cycle_audit_migration_has_run_and_event_contract() -> None:
+    sql = (Path(__file__).parents[1] / "migrations" / "0005_cycle_audit.sql").read_text(encoding="utf-8")
+    for required in ("create table if not exists cycle_runs", "create table if not exists cycle_events", "reason_codes jsonb", "error_message text"):
+        assert required in sql
+
+
 @pytest.mark.asyncio
 async def test_ticker_prices_falls_back_to_lightweight_endpoint() -> None:
     client = BinancePublicClient("https://api.binance.com", "https://data-api.binance.vision")

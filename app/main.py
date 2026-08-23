@@ -204,6 +204,26 @@ async def market_tickers() -> dict:
         raise HTTPException(status_code=503, detail="Binance public market data unavailable") from exc
 
 
+@app.get("/api/cycles")
+async def recent_cycles(
+    limit: int = Query(default=30, ge=1, le=200),
+    search: str = Query(default="", max_length=100),
+) -> list[dict]:
+    if postgres is None or postgres.pool is None:
+        return []
+    return await postgres.recent_cycles(limit=limit, search=search)
+
+
+@app.get("/api/cycles/{cycle_id}")
+async def cycle_detail(cycle_id: str) -> dict:
+    if postgres is None or postgres.pool is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL is not ready")
+    result = await postgres.cycle_detail(cycle_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    return result
+
+
 @app.get("/api/dashboard/config")
 def dashboard_config() -> dict:
     return {

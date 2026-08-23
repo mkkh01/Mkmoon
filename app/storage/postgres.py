@@ -216,3 +216,155 @@ class PostgresStore:
                 """
             )
         return dict(row) if row else {"total": 0, "open": 0, "closed": 0}
+
+    async def start_cycle(
+        self,
+        cycle_id: str,
+        started_at_ms: int,
+        mode: str,
+        symbols_requested: int,
+        code_version: str,
+        config_version: str,
+    ) -> None:
+        pool = self._require_pool()
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                insert into cycle_runs(
+                    cycle_id, started_at_ms, status, mode, symbols_requested,
+                    code_version, config_version
+                ) values($1,$2,'RUNNING',$3,$4,$5,$6)
+                on conflict(cycle_id) do nothing
+                """,
+                cycle_id,
+                started_at_ms,
+                mode,
+                symbols_requested,
+                code_version,
+                config_version,
+            )
+
+    async def record_cycle_event(
+        self,
+        cycle_id: str,
+        sequence_id: int,
+        stage: str,
+        status: str,
+        event_time_ms: int,
+        symbol: str | None = None,
+        duration_ms: int | None = None,
+        reason_codes: list[str] | None = None,
+        metrics: dict | None = None,
+        error_type: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        pool = self._require_pool()
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                insert into cycle_events(
+                    cycle_id, sequence_id, symbol, stage, status, event_time_ms,
+                    duration_ms, reason_codes, metrics, error_type, error_message
+                ) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11)
+                on conflict(cycle_id, sequence_id) do nothing
+                """,
+                cycle_id,
+                sequence_id,
+                symbol,
+                stage,
+                status,
+                event_time_ms,
+                duration_ms,
+                json.dumps(reason_codes or []),
+                json.dumps(metrics or {}),
+                error_type,
+                error_message,
+            )
+
+    async def finish_cycle(
+        self,
+        cycle_id: str,
+        finished_at_ms: int,
+        status: str,
+        symbols_processed: int,
+        decisions_count: int,
+        orders_created: int,
+        error_count: int,
+        summary: dict,
+    ) -> None:
+        pool = self._require_pool()
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                update cycle_runs
+                set finished_at_ms=$2,
+                    status=$3,
+                    symbols_processed=$4,
+                    decisions_count=$5,
+                    orders_created=$6,
+                    error_count=$7,
+                    summary=$8::jsonb
+                where cycle_id=$1
+                """,
+                cycle_id,
+                finished_at_ms,
+                status,
+                symbols_processed,
+                decisions_count,
+                orders_created,
+                error_count,
+                json.dumps(summary),
+            )
+
+    async def recent_cycles(self, limit: int = 30, search: str = "") -> list[dict]:
+        pool = self._require_pool()
+        if not 1 <= limit <= 200:
+            raise ValueError("limit must be between 1 and 200")
+        search = search.strip().upper()
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                select cycle_id, started_at_ms, finished_at_ms, status, mode,
+                       symbols_requested, symbols_processed, decisions_count,
+                       orders_created, error_count, code_version, config_version, summary
+                from cycle_runs
+                where ($2 = '' or upper(cycle_id) like '%' || $2 || '%' or upper(status) like '%' || $2 || '%' or upper(mode) like '%' || $2 || '%')
+                order by started_at_ms desc
+                limit $1
+                """,
+                limit,
+                search,
+            )
+        return [dict(row) for row in rows]
+
+    async def cycle_detail(self, cycle_id: str, event_limit: int = 1000) -> dict | None:
+        pool = self._require_pool()
+        if not cycle_id.strip():
+            raise ValueError("cycle_id is required")
+        async with pool.acquire() as connection:
+            run = await connection.fetchrow(
+                """
+                select cycle_id, started_at_ms, finished_at_ms, status, mode,
+                       symbols_requested, symbols_processed, decisions_count,
+                       orders_created, error_count, code_version, config_version, summary
+                from cycle_runs
+                where cycle_id=$1
+                """,
+                cycle_id,
+            )
+            if run is None:
+                return None
+            events = await connection.fetch(
+                """
+                select event_id, cycle_id, sequence_id, symbol, stage, status,
+                       event_time_ms, duration_ms, reason_codes, metrics,
+                       error_type, error_message
+                from cycle_events
+                where cycle_id=$1
+                order by sequence_id asc
+                limit $2
+                """,
+                cycle_id,
+                event_limit,
+            )
+        return {"run": dict(run), "events": [dict(event) for event in events]}

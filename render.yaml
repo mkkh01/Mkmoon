@@ -12,6 +12,16 @@ services:
         value: paper
       - key: LIVE_TRADING_ENABLED
         value: "false"
+      - key: DATABASE_SSL_MODE
+        value: require
+      - key: POLL_INTERVAL_SECONDS
+        value: "60"
+      - key: TIMEZONE
+        value: UTC
+      - key: CANDLE_PERSISTENCE_ENABLED
+        value: "true"
+      - key: CONFIG_PATH
+        value: configs/config.v1.yaml
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -21,7 +31,7 @@ services:
       - key: BINANCE_API_SECRET
         sync: false
       - key: SYMBOLS
-        value: BTCUSDT,ETHUSDT,SOLUSDT
+        value: BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT
       - key: BINANCE_BASE_URL
         value: https://api.binance.com
       - key: BINANCE_DATA_BASE_URL
@@ -44,6 +54,16 @@ services:
         value: paper
       - key: LIVE_TRADING_ENABLED
         value: "false"
+      - key: DATABASE_SSL_MODE
+        value: require
+      - key: POLL_INTERVAL_SECONDS
+        value: "60"
+      - key: TIMEZONE
+        value: UTC
+      - key: CANDLE_PERSISTENCE_ENABLED
+        value: "true"
+      - key: CONFIG_PATH
+        value: configs/config.v1.yaml
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -53,7 +73,7 @@ services:
       - key: BINANCE_API_SECRET
         sync: false
       - key: SYMBOLS
-        value: BTCUSDT,ETHUSDT,SOLUSDT
+        value: BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT
       - key: BINANCE_BASE_URL
         value: https://api.binance.com
       - key: BINANCE_DATA_BASE_URL
