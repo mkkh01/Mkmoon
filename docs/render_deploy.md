@@ -2,12 +2,9 @@
 
 ## Services
 
-The repository includes `render.yaml` with:
+The repository includes `render.yaml` with one `mkmoon-api` Web Service: FastAPI serves `/health`, `/ready`, the Dashboard, and the API, while an Embedded Paper Worker runs inside the same process lifecycle. There is no separate Render Background Worker in the current deployment.
 
-1. `mkmoon-api`: FastAPI web service with `/health` and `/ready`.
-2. `mkmoon-worker`: background worker that polls Binance public market data and writes Paper decisions.
-
-Both services intentionally default to `TRADING_MODE=paper` and `LIVE_TRADING_ENABLED=false`.
+The Web Service and its embedded worker intentionally default to `TRADING_MODE=paper` and `LIVE_TRADING_ENABLED=false`.
 
 ## Environment variables
 
@@ -19,7 +16,7 @@ Set these in Render's environment settings, not in the repository:
 | `REDIS_URL` | Yes | Redis connection string |
 | `BINANCE_BASE_URL` | Yes | `https://api.binance.com` |
 | `BINANCE_DATA_BASE_URL` | Yes | `https://data-api.binance.vision` |
-| `SYMBOLS` | Yes | Explicit allowlist such as `BTCUSDT,ETHUSDT,SOLUSDT` |
+| `SYMBOLS` | Yes | Explicit allowlist of the current 25 symbols, matching `render.yaml` and the verified Render Environment |
 | `TRADING_MODE` | Yes | `paper` initially |
 | `LIVE_TRADING_ENABLED` | Yes | `false` initially |
 | `BINANCE_API_KEY` | No for Paper | Add only for a later private-account phase |
@@ -29,7 +26,7 @@ Use separate Render environment groups for Paper, Shadow, and any future Live se
 
 ## Deploy steps
 
-Create a new Blueprint in Render from the GitHub repository `mkkh01/Mkmoon`, review the two services, enter `DATABASE_URL` and `REDIS_URL` as secret values, and deploy. Confirm that the Web service returns `200` from `/health` and `/ready` before starting the worker.
+Create or update the Web Service in Render from the GitHub repository `mkkh01/Mkmoon`, enter `DATABASE_URL` and `REDIS_URL` as secret values, and deploy. Confirm that the Web Service returns `200` from `/health` and `/ready`; the embedded worker starts automatically from the Web Service lifespan.
 
 The worker does not send orders. It reads only public Binance endpoints, keeps closed candles, evaluates the deterministic decision engine, stores decisions in PostgreSQL, and publishes decision JSON to Redis when configured.
 

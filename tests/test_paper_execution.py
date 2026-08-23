@@ -76,6 +76,10 @@ def test_cycle_status_does_not_mark_interrupted_work_as_completed() -> None:
     ) == "FAILED"
     assert _cycle_status(
         fatal=False, interrupted=False, error_count=1, decisions_count=10,
+        audit_write_errors=0, symbols_failed=0, symbols_skipped=0,
+    ) == "PARTIAL"
+    assert _cycle_status(
+        fatal=False, interrupted=False, error_count=1, decisions_count=10,
         audit_write_errors=0, symbols_failed=1, symbols_skipped=0,
     ) == "PARTIAL"
     assert _cycle_status(

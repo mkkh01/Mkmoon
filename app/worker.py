@@ -102,7 +102,7 @@ def _cycle_status(
 ) -> str:
     if interrupted or fatal or (error_count > 0 and decisions_count == 0):
         return "FAILED"
-    if audit_write_errors == 0 and symbols_failed == 0 and symbols_skipped == 0:
+    if error_count == 0 and audit_write_errors == 0 and symbols_failed == 0 and symbols_skipped == 0:
         return "COMPLETED"
     return "PARTIAL"
 
@@ -134,16 +134,22 @@ async def run_once(
             await postgres.connect()
         if redis and redis.client is None:
             await redis.connect()
-        if settings.app_env == "production" and not (redis and redis.client):
-            now = int(time.time() * 1000)
-            log.error("paper cycle blocked: Redis is required for the production distributed lock")
-            return CycleResult(
-                cycle_id=f"cycle-blocked-{now}-{uuid.uuid4().hex[:8]}", status="FAILED_DEPENDENCY",
-                started_at_ms=now, finished_at_ms=now, duration_ms=0,
-                symbols_requested=len(symbols), symbols_processed=0, decisions_count=0,
-                orders_created=0, error_count=1, data_source="not_started",
-                errors=("RedisUnavailable",),
-            )
+        if settings.app_env == "production":
+            missing_dependencies = []
+            if not (redis and redis.client):
+                missing_dependencies.append("RedisUnavailable")
+            if not (postgres and postgres.pool):
+                missing_dependencies.append("PostgresUnavailable")
+            if missing_dependencies:
+                now = int(time.time() * 1000)
+                log.error("paper cycle blocked: required production dependencies unavailable: %s", missing_dependencies)
+                return CycleResult(
+                    cycle_id=f"cycle-blocked-{now}-{uuid.uuid4().hex[:8]}", status="FAILED_DEPENDENCY",
+                    started_at_ms=now, finished_at_ms=now, duration_ms=0,
+                    symbols_requested=len(symbols), symbols_processed=0, decisions_count=0,
+                    orders_created=0, error_count=len(missing_dependencies), data_source="not_started",
+                    errors=tuple(missing_dependencies),
+                )
         if redis and redis.client:
             try:
                 async with redis.lock("paper-cycle", ttl_seconds=settings.worker_lock_ttl_seconds):

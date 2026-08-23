@@ -10,7 +10,7 @@
 - `app/storage/`: PostgreSQL/Supabase وRedis.
 - `app/main.py`: FastAPI API وDashboard على Render.
 - `app/static/index.html`: لوحة مراقبة عربية متجاوبة للحالة، السوق، القرارات، الصفقات الورقية، وسجل التطبيق.
-- `app/worker.py`: عامل Paper دوري على Render.
+- `app/worker.py`: عامل Paper دوري مضمّن داخل نفس Render Web Service عبر FastAPI lifespan؛ لا توجد خدمة Background Worker منفصلة في النشر الحالي.
 - `migrations/`: جداول الشموع والقرارات والأحداث والأوامر الافتراضية وحجوزات المخاطر.
 - `tests/`: اختبارات الحتمية، المخاطر، Replay، وPaper execution.
 
@@ -43,7 +43,7 @@ python -m app.worker
 
 ## Render
 
-يعمل Paper Worker افتراضيًا داخل Web Service نفسه عندما تكون `TRADING_MODE=paper` و`LIVE_TRADING_ENABLED=false`، عبر مهمة `asyncio` غير حاجبة تبدأ بعد إقلاع FastAPI وتتوقف عند إغلاقه. لذلك لا يحتاج تشغيل النظام الأساسي إلى Background Worker مدفوع منفصل. يبقى تعريف `mkmoon-worker` في `render.yaml` خيارًا للتوسعة، لكنه ليس مطلوبًا عندما يكون الـembedded loop فعالًا. على الخطة المجانية قد يوقف Render الخدمة بعد الخمول، وقد يعاد تشغيل العملية؛ عند كل إقلاع تستأنف المهمة من دورة جديدة، وتبقى Cycle Summary هي المرجع لاكتشاف الدورات المتوقفة أو غير المكتملة. اضبط الأسرار من لوحة Render فقط:
+يعمل Paper Worker داخل Web Service نفسه عندما تكون `TRADING_MODE=paper` و`LIVE_TRADING_ENABLED=false`، عبر مهمة `asyncio` تبدأ بعد إقلاع FastAPI وتتوقف عند إغلاقه. لذلك لا يحتاج التشغيل الحالي إلى Background Worker مدفوع أو خدمة Render ثانية. على الخطة المجانية قد يوقف Render الخدمة بعد الخمول أو يعيد تشغيل العملية؛ عند كل إقلاع تبدأ دورة جديدة، وتبقى Cycle Summary هي المرجع لاكتشاف الدورات المتوقفة أو غير المكتملة. اضبط الأسرار من لوحة Render فقط:
 
 - `DATABASE_URL`: رابط PostgreSQL الخاص بـSupabase.
 - `REDIS_URL`: رابط Redis.
@@ -60,4 +60,4 @@ python -m app.worker
 
 ## حدود الإصدار الحالي
 
-الإصدار الحالي ليس نظامًا يثبت الربحية ولا يرسل أوامر حقيقية. ما يزال يلزم قبل Live: تثبيت بروتوكول قبول رقمي، توسيع تنفيذ Position/Order lifecycle، إضافة WebSocket reconciliation، تفعيل account snapshots وrisk reservations الذرية، وبناء Backtest كامل ببيانات تاريخية وسياسة purge/embargo وFinal Test مقفلة.
+الإصدار الحالي ليس نظامًا يثبت الربحية ولا يرسل أوامر حقيقية. Paper account وPaper positions وrisk reservations الذرية ومسار الإغلاق الورقي موجودة للتجربة والتدقيق؛ وما يزال يلزم قبل Live: بروتوكول قبول رقمي، تنفيذ Live Position/Order lifecycle كامل، WebSocket reconciliation، account snapshots لحساب حقيقي، وبناء Backtest كامل ببيانات تاريخية وسياسة purge/embargo وFinal Test مقفلة.

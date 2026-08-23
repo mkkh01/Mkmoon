@@ -44,8 +44,8 @@ class DashboardLogHandler(logging.Handler):
 
     @staticmethod
     def _redact(message: str) -> str:
-        message = re.sub(r"(?i)(?:postgres(?:ql)?|redis)://[^\\s]+", "[redacted-url]", message)
-        return re.sub(r"(?i)(password|passwd|secret|token)=([^\\s,]+)", r"\\1=[redacted]", message)
+        message = re.sub(r"(?i)(?:postgres(?:ql)?|redis)://[^\s]+", "[redacted-url]", message)
+        return re.sub(r"(?i)(password|passwd|secret|token)=([^\s,]+)", r"\1=[redacted]", message)
 
     def emit(self, record: logging.LogRecord) -> None:
         try:

@@ -6,7 +6,6 @@ import json
 from app.adapters.binance_public import BinancePublicClient
 from app.core.settings import Settings
 from app.engine.decision import evaluate_decision
-from app.engine.risk import RiskFilters
 from app.worker import TIMEFRAMES, _risk_filters
 
 
