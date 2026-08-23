@@ -36,6 +36,17 @@ def test_dashboard_uses_latest_completed_cycle_and_unambiguous_counts() -> None:
     assert "حلّل ${data.worker_symbols" in html
 
 
+def test_dashboard_translates_and_disambiguates_diagnostics() -> None:
+    html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
+    assert "\\\\n\\\\n" not in html
+    assert "تحققت ${totalPass} من ${total}" in html
+    assert "Score التغطية" in html
+    assert "readableReason" in html
+    assert "readableEv" in html
+    assert "قيد التحديث" in html
+    assert "const reasons=(event.reason_codes||[]).map(readableReason)" in html
+
+
 def test_cycle_audit_migration_has_run_and_event_contract() -> None:
     sql = (Path(__file__).parents[1] / "migrations" / "0005_cycle_audit.sql").read_text(encoding="utf-8")
     for required in ("create table if not exists cycle_runs", "create table if not exists cycle_events", "reason_codes jsonb", "error_message text"):
