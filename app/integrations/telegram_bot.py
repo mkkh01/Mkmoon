@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import html
 import logging
+import re
 import secrets
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -70,9 +71,13 @@ class TelegramBot:
         self.token = token.strip()
         if not self.token:
             raise ValueError("Telegram token cannot be empty")
-        self.webhook_secret = webhook_secret or hashlib.sha256(
-            f"mkmoon-webhook:{self.token}".encode("utf-8")
-        ).hexdigest()
+        derived_secret = hashlib.sha256(f"mkmoon-webhook:{self.token}".encode("utf-8")).hexdigest()
+        candidate_secret = (webhook_secret or "").strip()
+        self.webhook_secret = (
+            candidate_secret
+            if re.fullmatch(r"[A-Za-z0-9_-]{1,256}", candidate_secret)
+            else derived_secret
+        )
         self.allowed_chat_ids = allowed_chat_ids or set()
         self.dashboard_url = dashboard_url.rstrip("/") + "/"
         self.get_summary = get_summary
@@ -84,6 +89,7 @@ class TelegramBot:
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
         self._dispatch_limit = asyncio.Semaphore(2)
         self.started = False
+        self.startup_error: str | None = None
 
     @property
     def configured(self) -> bool:
@@ -130,6 +136,7 @@ class TelegramBot:
             },
         )
         self.started = True
+        self.startup_error = None
         log.info("Telegram webhook configured bot=%s", username)
 
     async def _send(self, chat_id: int, text: str, reply_markup: dict | None = None) -> None:

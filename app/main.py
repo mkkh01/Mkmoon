@@ -160,8 +160,10 @@ async def lifespan(_: FastAPI):
                 get_logs=_telegram_get_logs,
             )
             await telegram_bot.startup(settings.public_base_url)
-        except Exception:
-            logger.exception("Telegram bot startup failed; HTTP service remains available")
+        except Exception as error:
+            if telegram_bot:
+                telegram_bot.startup_error = type(error).__name__
+            logger.error("Telegram bot startup failed error_type=%s", type(error).__name__)
 
     paper_task: asyncio.Task | None = None
     paper_enabled = settings.trading_mode == "paper" and not settings.live_trading_enabled
@@ -273,6 +275,7 @@ def telegram_health() -> dict:
     return {
         "configured": bool(settings.telegram_bot_token),
         "started": bool(telegram_bot and telegram_bot.started),
+        "startup_error": telegram_bot.startup_error if telegram_bot else None,
         "allowed_chat_ids_configured": bool(settings.telegram_allowed_chat_ids.strip()),
         "webhook_path": "/telegram/webhook",
         "read_only": True,
