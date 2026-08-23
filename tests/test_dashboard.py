@@ -12,13 +12,14 @@ def test_dashboard_has_25_unique_usdt_symbols() -> None:
     assert all(symbol.endswith("USDT") for symbol in DASHBOARD_SYMBOLS)
 
 
-def test_dashboard_uses_websocket_with_safe_fallbacks() -> None:
+def test_dashboard_updates_only_on_manual_request() -> None:
     html = (Path(__file__).parents[1] / "app" / "static" / "index.html").read_text(encoding="utf-8")
-    assert "new WebSocket(MARKET_STREAM_URL)" in html
-    assert "@miniTicker" in html
-    assert "scheduled rotation" in html
+    assert 'id="refreshBtn" class="btn">تحديث يدوي</button>' in html
     assert "loadBrowserMarket" in html
     assert "getJson('/api/market/tickers', 4500)" in html
+    assert "new WebSocket" not in html
+    assert "setInterval" not in html
+    assert "هذه الصفحة لا تحدث البيانات تلقائيًا" in html
 
 
 def test_dashboard_exposes_cycle_summary_timeline() -> None:
