@@ -153,7 +153,7 @@
         <div class="feed-note"><strong>مصدر الأسعار:</strong> Binance public market data. الأسعار ليست أوامر تنفيذ، ويتم تحديثها تلقائيًا كل 15 ثانية. القائمة تتضمن 25 زوجًا من أزواج USDT.</div>
         <div class="grid">
           <section class="panel">
-            <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">آخر سعر، التغير خلال 24 ساعة، وأعلى/أدنى نطاق.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
+            <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">آخر سعر من Binance، مع التغير والنطاق عندما تسمح واجهة السوق العامة.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
             <div class="toolbar"><input id="marketSearch" class="field" type="search" placeholder="ابحث عن زوج مثل BTC أو SOL" aria-label="البحث في السوق" /></div>
             <div id="marketBox" class="table-wrap"></div>
           </section>
@@ -193,6 +193,7 @@
 
   <script>
     const state = { tickers: [], orderView: 'all' };
+    const DASHBOARD_SYMBOLS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','TRXUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','POLUSDT','LTCUSDT','BCHUSDT','ATOMUSDT','UNIUSDT','ETCUSDT','FILUSDT','NEARUSDT','APTUSDT','OPUSDT','ARBUSDT','SUIUSDT','INJUSDT','XLMUSDT'];
     const $ = (id) => document.getElementById(id);
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
     const fmtTime = (ms) => ms ? new Date(Number(ms)).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
@@ -240,9 +241,33 @@
         if (data.live_trading_enabled !== false || data.trading_mode !== 'paper') document.querySelector('.mode-chip').innerHTML = '<span class="dot"></span> تحقق من وضع التشغيل';
       } catch (error) { setText('serviceMetric', 'خطأ'); setText('envMetric', 'تعذر جلب الملخص'); }
     }
+    async function loadBrowserMarket() {
+      const params = encodeURIComponent(JSON.stringify(DASHBOARD_SYMBOLS));
+      const hosts = ['https://api.binance.com', 'https://api1.binance.com', 'https://api2.binance.com'];
+      let lastError = null;
+      for (const host of hosts) {
+        try {
+          const response = await fetch(`${host}/api/v3/ticker/price?symbols=${params}`, { headers: { 'Accept': 'application/json' } });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const rows = await response.json();
+          state.tickers = rows.map((item) => ({ symbol: item.symbol, price: item.price, change_percent: null, high: null, low: null, volume: null, quote_volume: null, updated_at_ms: Date.now() }));
+          setText('marketUpdated', `Binance مباشر · ${fmtTime(Date.now())}`);
+          renderMarket();
+          return;
+        } catch (error) { lastError = error; }
+      }
+      throw lastError || new Error('Browser market fallback failed');
+    }
     async function loadMarket() {
-      try { const data = await getJson('/api/market/tickers'); state.tickers = data.data || []; setText('marketUpdated', `تحديث ${fmtTime(data.updated_at_ms)}`); renderMarket(); }
-      catch (error) { $('marketBox').innerHTML = '<div class="error-box">تعذر جلب بيانات Binance العامة حاليًا. ستتم المحاولة تلقائيًا.</div>'; }
+      try {
+        const data = await getJson('/api/market/tickers');
+        state.tickers = data.data || [];
+        setText('marketUpdated', `تحديث ${fmtTime(data.updated_at_ms)}`);
+        renderMarket();
+      } catch (error) {
+        try { await loadBrowserMarket(); }
+        catch (browserError) { $('marketBox').innerHTML = '<div class="error-box">تعذر جلب بيانات Binance العامة حاليًا. ستتم المحاولة تلقائيًا.</div>'; }
+      }
     }
     async function loadDecisions() {
       try { const items = await getJson(`/api/decisions?limit=100&search=${encodeURIComponent(($('decisionSearch')?.value || '').trim())}`); renderDecisionTable(items, 'decisionsBox'); renderDecisionTable(items.slice(0, 6), 'decisionPreview'); setText('decisionCount', `${items.length} قرار`); }
