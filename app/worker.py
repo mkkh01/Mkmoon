@@ -90,6 +90,23 @@ def _first_exit_fill(
     return None, None
 
 
+def _cycle_status(
+    *,
+    fatal: bool,
+    interrupted: bool,
+    error_count: int,
+    decisions_count: int,
+    audit_write_errors: int,
+    symbols_failed: int,
+    symbols_skipped: int,
+) -> str:
+    if interrupted or fatal or (error_count > 0 and decisions_count == 0):
+        return "FAILED"
+    if audit_write_errors == 0 and symbols_failed == 0 and symbols_skipped == 0:
+        return "COMPLETED"
+    return "PARTIAL"
+
+
 async def run_once(
     *,
     settings: Settings | None = None,
@@ -207,6 +224,7 @@ async def _run_cycle(
     observed_r: list[Decimal] = []
     fetch_semaphore = asyncio.Semaphore(settings.worker_concurrency)
     fatal = False
+    interrupted = False
     try:
         if postgres and db_ready:
             try:
@@ -461,18 +479,22 @@ async def _run_cycle(
                     })
                     await persist_error("SYMBOL_UNHANDLED", result, symbol=symbol)
     except asyncio.CancelledError:
+        interrupted = True
         raise
     except Exception as error:
         await persist_error("CYCLE_UNHANDLED", error)
     finally:
         finished_at_ms = int(time.time() * 1000)
         stats["sources_seen"] = sorted(sources)
-        if fatal or (stats["error_count"] > 0 and stats["decisions_count"] == 0):
-            cycle_status = "FAILED"
-        elif stats["error_count"] == 0 and stats["audit_write_errors"] == 0 and stats["symbols_failed"] == 0 and stats["symbols_skipped"] == 0:
-            cycle_status = "COMPLETED"
-        else:
-            cycle_status = "PARTIAL"
+        cycle_status = _cycle_status(
+            fatal=fatal,
+            interrupted=interrupted,
+            error_count=stats["error_count"],
+            decisions_count=stats["decisions_count"],
+            audit_write_errors=stats["audit_write_errors"],
+            symbols_failed=stats["symbols_failed"],
+            symbols_skipped=stats["symbols_skipped"],
+        )
         summary = {
             "cycle_id": cycle_id, "started_at_ms": started_at_ms, "finished_at_ms": finished_at_ms,
             "duration_ms": finished_at_ms - started_at_ms, "mode": str(settings.trading_mode),

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from app.core.models import Candle, Decision, DecisionStatus, RiskPlan
 from app.engine.paper import simulate_long_entry, simulate_long_exit
-from app.worker import _first_exit_fill
+from app.worker import _cycle_status, _first_exit_fill
 
 
 def _decision() -> Decision:
@@ -67,3 +67,18 @@ def test_worker_exit_uses_first_hit_between_cycles() -> None:
     assert exit_time_ms == 2
     assert fill is not None
     assert fill.exit_reason == "TAKE_PROFIT"
+
+
+def test_cycle_status_does_not_mark_interrupted_work_as_completed() -> None:
+    assert _cycle_status(
+        fatal=False, interrupted=True, error_count=0, decisions_count=10,
+        audit_write_errors=0, symbols_failed=0, symbols_skipped=0,
+    ) == "FAILED"
+    assert _cycle_status(
+        fatal=False, interrupted=False, error_count=1, decisions_count=10,
+        audit_write_errors=0, symbols_failed=1, symbols_skipped=0,
+    ) == "PARTIAL"
+    assert _cycle_status(
+        fatal=False, interrupted=False, error_count=0, decisions_count=25,
+        audit_write_errors=0, symbols_failed=0, symbols_skipped=0,
+    ) == "COMPLETED"
