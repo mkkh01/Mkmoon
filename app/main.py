@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import threading
@@ -72,6 +73,14 @@ root_logger.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
 if not any(isinstance(handler, DashboardLogHandler) for handler in root_logger.handlers):
     root_logger.addHandler(log_buffer)
 logger = logging.getLogger("mkmoon.dashboard")
+paper_worker_state: dict[str, object] = {
+    "enabled": settings.trading_mode == "paper" and not settings.live_trading_enabled,
+    "running": False,
+    "last_cycle_started_at_ms": None,
+    "last_cycle_finished_at_ms": None,
+    "last_cycle_status": None,
+    "last_cycle_error": None,
+}
 
 
 @asynccontextmanager
@@ -84,13 +93,53 @@ async def lifespan(_: FastAPI):
         await redis_store.connect()
         logger.info("Redis connection established")
     logger.info("Paper-only guard active; live trading enabled=%s", settings.live_trading_enabled)
-    yield
-    await binance_public.aclose()
-    if redis_store:
-        await redis_store.close()
-    if postgres:
-        await postgres.close()
-    logger.info("Mkmoon API stopped")
+
+    paper_task: asyncio.Task | None = None
+    paper_enabled = settings.trading_mode == "paper" and not settings.live_trading_enabled
+    if paper_enabled:
+        from app.worker import run_once
+
+        async def paper_loop() -> None:
+            # Let the HTTP server finish startup before the first network-heavy cycle.
+            await asyncio.sleep(3)
+            while True:
+                started = time()
+                paper_worker_state["last_cycle_started_at_ms"] = int(started * 1000)
+                paper_worker_state["last_cycle_status"] = "RUNNING"
+                paper_worker_state["last_cycle_error"] = None
+                try:
+                    await run_once()
+                    paper_worker_state["last_cycle_status"] = "FINISHED"
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    paper_worker_state["last_cycle_status"] = "FAILED"
+                    paper_worker_state["last_cycle_error"] = type(error).__name__
+                    logger.exception("embedded Paper cycle failed; no orders are sent")
+                finally:
+                    paper_worker_state["last_cycle_finished_at_ms"] = int(time() * 1000)
+                elapsed = time() - started
+                await asyncio.sleep(max(5, settings.poll_interval_seconds - int(elapsed)))
+
+        paper_worker_state["running"] = True
+        paper_task = asyncio.create_task(paper_loop(), name="mkmoon-embedded-paper-worker")
+        logger.info("Embedded Paper worker started interval_seconds=%s", settings.poll_interval_seconds)
+
+    try:
+        yield
+    finally:
+        if paper_task:
+            paper_task.cancel()
+            await asyncio.gather(paper_task, return_exceptions=True)
+            paper_worker_state["running"] = False
+            paper_worker_state["last_cycle_status"] = "STOPPED"
+            logger.info("Embedded Paper worker stopped")
+        await binance_public.aclose()
+        if redis_store:
+            await redis_store.close()
+        if postgres:
+            await postgres.close()
+        logger.info("Mkmoon API stopped")
 
 
 app = FastAPI(title="Mkmoon Binance Spot Engine", version="0.2.0", lifespan=lifespan)
@@ -155,6 +204,7 @@ async def dashboard_summary() -> dict:
         "dashboard_symbols": len(DASHBOARD_SYMBOLS),
         "server_time_ms": int(time() * 1000),
         "errors": errors,
+        "paper_worker": dict(paper_worker_state),
     }
 
 

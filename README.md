@@ -43,7 +43,7 @@ python -m app.worker
 
 ## Render
 
-ملف `render.yaml` يعرّف خدمتين: Web API وBackground Worker. اضبط الأسرار من لوحة Render فقط:
+يعمل Paper Worker افتراضيًا داخل Web Service نفسه عندما تكون `TRADING_MODE=paper` و`LIVE_TRADING_ENABLED=false`، عبر مهمة `asyncio` غير حاجبة تبدأ بعد إقلاع FastAPI وتتوقف عند إغلاقه. لذلك لا يحتاج تشغيل النظام الأساسي إلى Background Worker مدفوع منفصل. يبقى تعريف `mkmoon-worker` في `render.yaml` خيارًا للتوسعة، لكنه ليس مطلوبًا عندما يكون الـembedded loop فعالًا. على الخطة المجانية قد يوقف Render الخدمة بعد الخمول، وقد يعاد تشغيل العملية؛ عند كل إقلاع تستأنف المهمة من دورة جديدة، وتبقى Cycle Summary هي المرجع لاكتشاف الدورات المتوقفة أو غير المكتملة. اضبط الأسرار من لوحة Render فقط:
 
 - `DATABASE_URL`: رابط PostgreSQL الخاص بـSupabase.
 - `REDIS_URL`: رابط Redis.

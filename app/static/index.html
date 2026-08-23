@@ -158,6 +158,7 @@
         <div class="metric info"><div class="metric-label">Redis</div><div id="redisMetric" class="metric-value">—</div><div class="metric-sub">التنسيق والـ locks</div></div>
         <div class="metric warn"><div class="metric-label">صفقات مفتوحة</div><div id="openMetric" class="metric-value">0</div><div class="metric-sub">Paper orders</div></div>
         <div class="metric"><div class="metric-label">صفقات مغلقة</div><div id="closedMetric" class="metric-value">0</div><div class="metric-sub">Paper history</div></div>
+        <div class="metric info"><div class="metric-label">Paper Worker</div><div id="workerMetric" class="metric-value">—</div><div id="workerMetricSub" class="metric-sub">حالة دورة الشموع</div></div>
       </section>
 
       <div id="overviewView" class="view active">
@@ -303,6 +304,9 @@
         setText('redisMetric', data.redis === 'connected' ? 'Connected' : data.redis || '—');
         setText('openMetric', data.orders?.open ?? 0);
         setText('closedMetric', data.orders?.closed ?? 0);
+        const worker = data.paper_worker || {};
+        setText('workerMetric', worker.running ? 'Running' : worker.enabled ? 'Stopped' : 'Disabled');
+        setText('workerMetricSub', worker.last_cycle_status ? `آخر دورة: ${worker.last_cycle_status}` : 'بانتظار أول دورة');
         if (data.live_trading_enabled !== false || data.trading_mode !== 'paper') document.querySelector('.mode-chip').innerHTML = '<span class="dot"></span> تحقق من وضع التشغيل';
       } catch (error) { setText('serviceMetric', 'خطأ'); setText('envMetric', 'تعذر جلب الملخص'); }
     }
