@@ -39,6 +39,8 @@ class StrategyDiagnostic:
             "passed_conditions": passed,
             "total_conditions": total,
             "progress_pct": round((passed / total) * 100, 2) if total else 0,
+            "score": round((passed / total) * 100, 2) if total else 0,
+            "score_basis": "condition_coverage",
             "ready": self.candidate is not None,
             "status": "READY" if self.candidate is not None else "INCOMPLETE",
             "first_failed_condition_ar": failed[0] if failed else None,
