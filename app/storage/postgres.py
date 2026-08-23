@@ -92,13 +92,127 @@ class PostgresStore:
                 decision.lineage.get("config_version", "unknown"),
             )
 
-    async def recent_decisions(self, limit: int = 50) -> list[dict]:
+    async def recent_decisions(self, limit: int = 50, search: str = "") -> list[dict]:
         pool = self._require_pool()
         if not 1 <= limit <= 500:
             raise ValueError("limit must be between 1 and 500")
+        search = search.strip().upper()
         async with pool.acquire() as connection:
             rows = await connection.fetch(
-                "select decision_id, symbol, decision_time_ms, status, payload, decision_hash from decisions order by decision_time_ms desc limit $1",
+                """
+                select decision_id, symbol, decision_time_ms, status, payload, decision_hash
+                from decisions
+                where ($2 = '' or upper(symbol) like '%' || $2 || '%' or upper(status) like '%' || $2 || '%')
+                order by decision_time_ms desc
+                limit $1
+                """,
                 limit,
+                search,
             )
         return [dict(row) for row in rows]
+
+    async def recent_paper_orders(
+        self,
+        view: str = "all",
+        search: str = "",
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        pool = self._require_pool()
+        if view not in {"all", "open", "closed"}:
+            raise ValueError("view must be all, open, or closed")
+        if not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+        search = search.strip().upper()
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                with classified as (
+                    select
+                        o.order_id,
+                        o.decision_id,
+                        o.symbol,
+                        o.side,
+                        o.order_type,
+                        o.status,
+                        o.requested_quantity,
+                        o.requested_price,
+                        o.filled_quantity,
+                        o.average_fill_price,
+                        o.fees,
+                        o.payload,
+                        o.created_at,
+                        o.updated_at,
+                        case
+                            when upper(o.status) in ('CLOSED','CANCELLED','REJECTED','EXPIRED') then 'closed'
+                            else 'open'
+                        end as lifecycle
+                    from paper_orders o
+                )
+                select
+                    c.order_id,
+                    c.decision_id,
+                    c.symbol,
+                    c.side,
+                    c.order_type,
+                    c.status,
+                    c.lifecycle,
+                    c.requested_quantity,
+                    c.requested_price,
+                    c.filled_quantity,
+                    c.average_fill_price,
+                    c.fees,
+                    c.payload,
+                    c.created_at,
+                    c.updated_at,
+                    coalesce(
+                        (
+                            select jsonb_agg(
+                                jsonb_build_object(
+                                    'fill_id', f.fill_id,
+                                    'quantity', f.quantity,
+                                    'price', f.price,
+                                    'fee', f.fee,
+                                    'fill_time_ms', f.fill_time_ms,
+                                    'payload', f.payload
+                                ) order by f.fill_time_ms desc
+                            )
+                            from paper_fills f
+                            where f.order_id = c.order_id
+                        ),
+                        '[]'::jsonb
+                    ) as fills
+                from classified c
+                where ($1 = 'all' or c.lifecycle = $1)
+                  and (
+                      $2 = ''
+                      or upper(c.order_id) like '%' || $2 || '%'
+                      or upper(c.decision_id) like '%' || $2 || '%'
+                      or upper(c.symbol) like '%' || $2 || '%'
+                      or upper(c.status) like '%' || $2 || '%'
+                  )
+                order by c.updated_at desc, c.created_at desc
+                limit $3 offset $4
+                """,
+                view,
+                search,
+                limit,
+                offset,
+            )
+        return [dict(row) for row in rows]
+
+    async def paper_order_counts(self) -> dict[str, int]:
+        pool = self._require_pool()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                select
+                    count(*)::int as total,
+                    count(*) filter (where upper(status) in ('CLOSED','CANCELLED','REJECTED','EXPIRED'))::int as closed,
+                    count(*) filter (where upper(status) not in ('CLOSED','CANCELLED','REJECTED','EXPIRED'))::int as open
+                from paper_orders
+                """
+            )
+        return dict(row) if row else {"total": 0, "open": 0, "closed": 0}

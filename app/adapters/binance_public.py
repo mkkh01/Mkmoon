@@ -93,6 +93,37 @@ class BinancePublicClient:
                 candles.append(candle)
         return candles
 
+    async def ticker_prices(self, symbols: list[str]) -> list[dict[str, Any]]:
+        """Return public latest prices for an allow-listed symbol set."""
+        normalized = list(dict.fromkeys(symbol.strip().upper() for symbol in symbols if symbol.strip()))
+        if not 1 <= len(normalized) <= 100:
+            raise ValueError("ticker symbol count must be between 1 and 100")
+        payload = await self._get(
+            f"{self.data_base_url}/api/v3/ticker/24hr",
+            {"symbols": json.dumps(normalized, separators=(",", ":"))},
+        )
+        if isinstance(payload, dict):
+            payload = [payload]
+        allowed = set(normalized)
+        result: list[dict[str, Any]] = []
+        for item in payload:
+            symbol = str(item.get("symbol", "")).upper()
+            if symbol not in allowed:
+                continue
+            result.append(
+                {
+                    "symbol": symbol,
+                    "price": str(item.get("lastPrice", "0")),
+                    "change_percent": str(item.get("priceChangePercent", "0")),
+                    "high": str(item.get("highPrice", "0")),
+                    "low": str(item.get("lowPrice", "0")),
+                    "volume": str(item.get("volume", "0")),
+                    "quote_volume": str(item.get("quoteVolume", "0")),
+                    "updated_at_ms": int(item.get("closeTime", 0) or 0),
+                }
+            )
+        return result
+
     async def ping(self) -> bool:
         await self._get(f"{self.base_url}/api/v3/ping")
         return True
