@@ -352,7 +352,7 @@ async def run_once() -> None:
             "duration_ms": finished_at_ms - started_at_ms,
             "mode": str(settings.trading_mode),
             "live_trading_enabled": bool(settings.live_trading_enabled),
-            "binance_data_source": "public_spot_rest_closed_klines",
+            "binance_data_source": client.last_public_base_url or "public_spot_rest_closed_klines",
             "redis_connected": redis_ready,
             "postgres_connected": db_ready,
             "audit_disabled": audit_disabled,
