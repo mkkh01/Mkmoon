@@ -35,7 +35,12 @@ class Settings(BaseSettings):
     min_atr_percentile: Decimal = Field(default=Decimal("5"), ge=0, le=100)
     max_atr_percentile: Decimal = Field(default=Decimal("95"), ge=0, le=100)
     poll_interval_seconds: int = Field(default=60, ge=5)
+    request_timeout_seconds: int = Field(default=20, ge=5, le=120)
+    cycle_timeout_seconds: int = Field(default=300, ge=30, le=1800)
+    worker_concurrency: int = Field(default=8, ge=1, le=16)
+    worker_lock_ttl_seconds: int = Field(default=600, ge=60, le=3600)
     config_path: str = "configs/config.v1.yaml"
+    dashboard_access_token: str | None = None
 
     @field_validator("trading_mode")
     @classmethod

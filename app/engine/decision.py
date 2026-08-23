@@ -5,6 +5,7 @@ from app.core.hashing import decision_hash
 from app.core.models import Candle, Decision, DecisionStatus, RegimeVector
 from app.core.policy import load_policy
 from app.core.settings import Settings
+from app.engine.ev import estimate_ev
 from app.engine.features import compute_features
 from app.engine.regime import classify_regime
 from app.engine.risk import RiskFilters, calculate_risk_plan
@@ -22,6 +23,8 @@ def evaluate_decision(
     equity: Decimal = Decimal("10000"),
     remaining_daily_risk: Decimal | None = None,
     remaining_portfolio_risk: Decimal | None = None,
+    observed_r: list[Decimal] | None = None,
+    data_source: str = "binance-spot",
 ) -> Decision:
     policy = load_policy(settings.config_path)
     features = compute_features(symbol, candles_by_timeframe, decision_time_ms)
@@ -32,9 +35,13 @@ def evaluate_decision(
     entry = stop = target = None
     quality = None
     components: dict[str, Decimal] = {}
-    ev_status = "INSUFFICIENT_DATA"
-    ev_r: Decimal | None = None
-    ev_sample_size = 0
+    edge = policy.get("edge", {})
+    minimum_sample = int(edge.get("minimum_sample", 100))
+    minimum_ev_r = Decimal(str(edge.get("minimum_ev_r", "0.10")))
+    ev_estimate = estimate_ev(observed_r or [], minimum_sample=minimum_sample, minimum_ev_r=minimum_ev_r)
+    ev_status = ev_estimate.status
+    ev_r = ev_estimate.ev_r
+    ev_sample_size = ev_estimate.sample_size
 
     if not features.valid:
         status = DecisionStatus.UNSAFE
@@ -69,9 +76,14 @@ def evaluate_decision(
             reasons.extend(risk.reason_codes)
             if risk.effective_rr < Decimal(str(policy["risk"]["min_effective_rr"])):
                 reasons.append("RR_TOO_LOW")
-            if policy["edge"]["mode"] == "disabled_until_calibrated":
-                reasons.append("EV_INSUFFICIENT")
+            mode = str(edge.get("mode", "disabled_until_calibrated"))
+            if mode == "disabled_until_calibrated":
+                reasons.append("EV_DISABLED_UNTIL_CALIBRATED")
                 status = DecisionStatus.CANDIDATE if not reasons[:-1] and risk.valid else DecisionStatus.NO_TRADE
+                ev_status = "DISABLED_UNTIL_CALIBRATED"
+            elif ev_estimate.status != "VALID":
+                reasons.append("EV_INSUFFICIENT" if ev_estimate.status == "INSUFFICIENT_DATA" else "EV_UNCERTAIN")
+                status = DecisionStatus.NO_TRADE
             else:
                 status = DecisionStatus.ENTER if not reasons and risk.valid else DecisionStatus.NO_TRADE
 
@@ -97,7 +109,7 @@ def evaluate_decision(
             "feature_version": str(policy["feature_version"]),
             "config_version": str(policy["version"]),
             "universe_snapshot_id": "runtime-symbol-list.v1",
-            "data_source": "binance-spot",
+            "data_source": data_source,
         },
     }
     digest = decision_hash(payload)

@@ -17,6 +17,7 @@ class BinancePublicClient:
         self.data_base_url = data_base_url.rstrip("/")
         self.fallback_base_url = fallback_base_url.rstrip("/") if fallback_base_url else None
         self.last_public_base_url: str | None = None
+        self.public_base_urls: set[str] = set()
         self.client = httpx.AsyncClient(timeout=timeout_seconds, headers={"User-Agent": "mkmoon/0.1"})
 
     async def aclose(self) -> None:
@@ -49,6 +50,7 @@ class BinancePublicClient:
             try:
                 result = await self._get(f"{base_url}{path}", params)
                 self.last_public_base_url = base_url
+                self.public_base_urls.add(base_url)
                 return result
             except RuntimeError as exc:
                 last_error = exc
@@ -103,6 +105,7 @@ class BinancePublicClient:
                 close=Decimal(str(row[4])),
                 volume=Decimal(str(row[5])),
                 is_closed=int(row[6]) <= decision_time_ms,
+                source_id=self.last_public_base_url or "binance-spot-public",
             )
             if candle.is_closed:
                 candles.append(candle)
@@ -116,6 +119,8 @@ class BinancePublicClient:
         params = {"symbols": json.dumps(normalized, separators=(",", ":"))}
         try:
             payload = await self._get(f"{self.data_base_url}/api/v3/ticker/24hr", params)
+            self.last_public_base_url = self.data_base_url
+            self.public_base_urls.add(self.data_base_url)
         except RuntimeError as primary_error:
             # Some hosted egress IPs receive Binance 418 on data-api.vision.
             # Try the lighter public price route, then the configured API host.
@@ -133,6 +138,8 @@ class BinancePublicClient:
             for base_url in dict.fromkeys(host.rstrip("/") for host in fallback_hosts if host):
                 try:
                     payload = await self._get(f"{base_url}/api/v3/ticker/price", params)
+                    self.last_public_base_url = base_url
+                    self.public_base_urls.add(base_url)
                     break
                 except RuntimeError as exc:
                     last_error = exc

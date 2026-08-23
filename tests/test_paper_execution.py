@@ -1,0 +1,47 @@
+from decimal import Decimal
+from datetime import datetime, timezone
+
+from app.core.models import Candle, Decision, DecisionStatus, RiskPlan
+from app.engine.paper import simulate_long_entry, simulate_long_exit
+
+
+def _decision() -> Decision:
+    return Decision(
+        decision_id="d-paper",
+        symbol="BTCUSDT",
+        decision_time_ms=1000,
+        data_cutoff_ms=900,
+        status=DecisionStatus.ENTER,
+        entry_price=Decimal("100"),
+        stop_price=Decimal("99"),
+        target_price=Decimal("102"),
+        quality_score=Decimal("80"),
+        risk=RiskPlan(
+            risk_cash=Decimal("10"), risk_pct=Decimal("0.01"), entry_price=Decimal("100"),
+            stop_price=Decimal("99"), target_price=Decimal("102"), unit_risk=Decimal("1"),
+            quantity=Decimal("0.1"), effective_risk_cash=Decimal("0.1"),
+            expected_cost_cash=Decimal("0.01"), effective_rr=Decimal("2"), valid=True,
+        ),
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+def test_paper_entry_is_adverse_and_charges_fee() -> None:
+    entry = simulate_long_entry(_decision(), fee_rate=Decimal("0.001"), slippage_rate=Decimal("0.01"))
+    assert entry is not None
+    assert entry.fill_price == Decimal("101.00")
+    assert entry.quantity == Decimal("0.1")
+    assert entry.fee == Decimal("0.010100")
+
+
+def test_paper_exit_is_conservative_and_net_of_fee() -> None:
+    candle = Candle(
+        symbol="BTCUSDT", timeframe="5m", open_time_ms=1, close_time_ms=2,
+        open=Decimal("100"), high=Decimal("103"), low=Decimal("98"), close=Decimal("101"),
+        volume=Decimal("10"), is_closed=True,
+    )
+    result = simulate_long_exit(_decision(), candle, fee_rate=Decimal("0.001"))
+    assert result.status == "CLOSED"
+    assert result.exit_reason == "STOP_AND_TARGET_SAME_CANDLE_CONSERVATIVE_STOP"
+    assert result.fill_price == Decimal("99")
+    assert result.realized_pnl < Decimal("0")

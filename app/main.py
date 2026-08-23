@@ -3,14 +3,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 import threading
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import time
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.adapters.binance_public import BinancePublicClient
 from app.core.settings import get_settings
@@ -80,10 +81,14 @@ logger = logging.getLogger("mkmoon.dashboard")
 paper_worker_state: dict[str, object] = {
     "enabled": settings.trading_mode == "paper" and not settings.live_trading_enabled,
     "running": False,
+    "last_cycle_id": None,
     "last_cycle_started_at_ms": None,
     "last_cycle_finished_at_ms": None,
+    "last_cycle_duration_ms": None,
     "last_cycle_status": None,
     "last_cycle_error": None,
+    "last_cycle_data_source": None,
+    "last_cycle_errors": [],
 }
 
 
@@ -112,13 +117,23 @@ async def lifespan(_: FastAPI):
                 paper_worker_state["last_cycle_status"] = "RUNNING"
                 paper_worker_state["last_cycle_error"] = None
                 try:
-                    await run_once()
-                    paper_worker_state["last_cycle_status"] = "FINISHED"
+                    result = await asyncio.wait_for(
+                        run_once(postgres_store=postgres, redis_store=redis_store, client=binance_public),
+                        timeout=settings.cycle_timeout_seconds,
+                    )
+                    paper_worker_state["last_cycle_id"] = result.cycle_id
+                    paper_worker_state["last_cycle_status"] = result.status
+                    paper_worker_state["last_cycle_duration_ms"] = result.duration_ms
+                    paper_worker_state["last_cycle_data_source"] = result.data_source
+                    paper_worker_state["last_cycle_errors"] = list(result.errors)
+                    if result.errors:
+                        paper_worker_state["last_cycle_error"] = result.errors[-1]
                 except asyncio.CancelledError:
                     raise
                 except Exception as error:
-                    paper_worker_state["last_cycle_status"] = "FAILED"
+                    paper_worker_state["last_cycle_status"] = "FAILED_UNHANDLED"
                     paper_worker_state["last_cycle_error"] = type(error).__name__
+                    paper_worker_state["last_cycle_errors"] = [type(error).__name__]
                     logger.exception("embedded Paper cycle failed; no orders are sent")
                 finally:
                     paper_worker_state["last_cycle_finished_at_ms"] = int(time() * 1000)
@@ -147,6 +162,17 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Mkmoon Binance Spot Engine", version="0.2.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def dashboard_api_guard(request: Request, call_next):
+    configured = settings.dashboard_access_token
+    if configured and request.url.path.startswith("/api/"):
+        supplied = request.headers.get("authorization", "")
+        token = supplied[7:] if supplied.lower().startswith("bearer ") else request.headers.get("x-dashboard-token", "")
+        if not token or not secrets.compare_digest(token, configured):
+            return JSONResponse({"detail": "Dashboard API authentication required"}, status_code=401)
+    return await call_next(request)
 
 
 @app.get("/", include_in_schema=False)
@@ -183,7 +209,8 @@ async def dashboard_summary() -> dict:
         database_status = "connected"
         try:
             counts = await postgres.paper_order_counts()
-            decision_count = len(await postgres.recent_decisions(limit=5))
+            decision_count = await postgres.decision_count()
+
         except Exception as exc:
             database_status = "error"
             errors.append("database query failed")
@@ -206,6 +233,8 @@ async def dashboard_summary() -> dict:
         "orders": counts,
         "recent_decisions": decision_count,
         "dashboard_symbols": len(DASHBOARD_SYMBOLS),
+        "worker_symbols": len(settings.symbol_list()),
+        "worker_data_source": paper_worker_state.get("last_cycle_data_source"),
         "server_time_ms": int(time() * 1000),
         "errors": errors,
         "paper_worker": dict(paper_worker_state),
@@ -248,7 +277,7 @@ async def market_tickers() -> dict:
     try:
         tickers = await binance_public.ticker_prices(DASHBOARD_SYMBOLS)
         return {
-            "source": "Binance public market data",
+            "source": binance_public.last_public_base_url or "Binance public market data",
             "symbols_requested": len(DASHBOARD_SYMBOLS),
             "updated_at_ms": int(time() * 1000),
             "data": tickers,

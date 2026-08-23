@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import ssl
+import time
+from decimal import Decimal
 from typing import Iterable
 
 import asyncpg
@@ -216,6 +218,284 @@ class PostgresStore:
                 """
             )
         return dict(row) if row else {"total": 0, "open": 0, "closed": 0}
+
+    async def decision_count(self, search: str = "") -> int:
+        pool = self._require_pool()
+        search = search.strip().upper()
+        async with pool.acquire() as connection:
+            value = await connection.fetchval(
+                """
+                select count(*)::int
+                from decisions
+                where ($1 = '' or upper(symbol) like '%' || $1 || '%' or upper(status) like '%' || $1 || '%')
+                """,
+                search,
+            )
+        return int(value or 0)
+
+    async def observed_realized_r(self, limit: int = 5000) -> list[Decimal]:
+        pool = self._require_pool()
+        if not 1 <= limit <= 10000:
+            raise ValueError("limit must be between 1 and 10000")
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                select realized_pnl, payload->>'risk_cash' as risk_cash
+                from paper_positions
+                where state='CLOSED' and realized_pnl is not null
+                order by closed_at_ms desc
+                limit $1
+                """,
+                limit,
+            )
+        result: list[Decimal] = []
+        for row in rows:
+            risk_cash = Decimal(str(row["risk_cash"] or "0"))
+            if risk_cash > 0:
+                result.append(Decimal(str(row["realized_pnl"] or "0")) / risk_cash)
+        return result
+
+    async def active_paper_position(self, symbol: str) -> dict | None:
+        pool = self._require_pool()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                select position_id, account_id, order_id, decision_id, symbol, state,
+                       quantity, entry_price, stop_price, target_price, entry_fee,
+                       exit_price, exit_fee, realized_pnl, opened_at_ms, closed_at_ms, payload
+                from paper_positions
+                where symbol=$1 and state in ('ENTERED','ACTIVE','PROTECTED','EXITING')
+                order by opened_at_ms desc
+                limit 1
+                """,
+                symbol,
+            )
+        return dict(row) if row else None
+
+    async def create_paper_trade(self, decision: Decision, entry, data_source: str) -> dict:
+        """Atomically reserve risk, create/fill a Paper BUY, and open one position."""
+        pool = self._require_pool()
+        if decision.status.value != "ENTER" or decision.risk is None:
+            return {"status": "SKIPPED", "reason": "DECISION_NOT_ENTER"}
+        order_id = f"paper-order:{decision.decision_id}"
+        reservation_id = f"paper-reservation:{decision.decision_id}"
+        position_id = f"paper-position:{decision.decision_id}"
+        fill_id = f"paper-fill:entry:{decision.decision_id}"
+        now_ms = int(time.time() * 1000)
+        quantity = entry.quantity
+        fill_price = entry.fill_price
+        notional = quantity * fill_price
+        total_entry_cash = notional + entry.fee
+        payload = {
+            "mode": "paper",
+            "data_source": data_source,
+            "risk_cash": str(decision.risk.risk_cash),
+            "notional": str(notional),
+            "entry_decision_time_ms": decision.decision_time_ms,
+        }
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                existing = await connection.fetchrow(
+                    "select order_id, status from paper_orders where decision_id=$1 limit 1",
+                    decision.decision_id,
+                )
+                if existing:
+                    return {"status": "DUPLICATE", "order_id": existing["order_id"], "order_status": existing["status"]}
+                active = await connection.fetchval(
+                    """
+                    select position_id from paper_positions
+                    where symbol=$1 and state in ('ENTERED','ACTIVE','PROTECTED','EXITING')
+                    limit 1
+                    """,
+                    decision.symbol,
+                )
+                if active:
+                    return {"status": "SKIPPED", "reason": "ACTIVE_POSITION_EXISTS", "position_id": active}
+                account = await connection.fetchrow(
+                    "select cash_balance, reserved_cash from paper_accounts where account_id='paper:default' for update"
+                )
+                if account is None:
+                    raise RuntimeError("paper account is not initialized; apply migration 0006")
+                if Decimal(str(account["cash_balance"])) < total_entry_cash:
+                    await connection.execute(
+                        """
+                        insert into paper_orders(order_id, decision_id, symbol, side, order_type, status,
+                            requested_quantity, requested_price, payload)
+                        values($1,$2,$3,'BUY','MARKET_PAPER','REJECTED',$4,$5,$6::jsonb)
+                        """,
+                        order_id, decision.decision_id, decision.symbol, quantity, fill_price,
+                        json.dumps({**payload, "reason": "INSUFFICIENT_PAPER_CASH"}),
+                    )
+                    return {"status": "REJECTED", "reason": "INSUFFICIENT_PAPER_CASH", "order_id": order_id}
+                await connection.execute(
+                    """
+                    insert into risk_reservations(reservation_id, decision_id, symbol, risk_cash, status)
+                    values($1,$2,$3,$4,'CONSUMED')
+                    """,
+                    reservation_id, decision.decision_id, decision.symbol, decision.risk.risk_cash,
+                )
+                await connection.execute(
+                    """
+                    insert into paper_orders(order_id, decision_id, symbol, side, order_type, status,
+                        requested_quantity, requested_price, filled_quantity, average_fill_price, fees, payload)
+                    values($1,$2,$3,'BUY','MARKET_PAPER','FILLED',$4,$5,$4,$5,$6,$7::jsonb)
+                    """,
+                    order_id, decision.decision_id, decision.symbol, quantity, fill_price, entry.fee,
+                    json.dumps(payload),
+                )
+                await connection.execute(
+                    """
+                    insert into paper_fills(fill_id, order_id, symbol, quantity, price, fee, fill_time_ms, payload)
+                    values($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+                    """,
+                    fill_id, order_id, decision.symbol, quantity, fill_price, entry.fee, entry.entry_time_ms,
+                    json.dumps({"side": "BUY", "fill_type": "ENTRY", **payload}),
+                )
+                await connection.execute(
+                    """
+                    insert into paper_positions(
+                        position_id, account_id, order_id, decision_id, symbol, state, quantity,
+                        entry_price, stop_price, target_price, entry_fee, opened_at_ms, payload)
+                    values($1,'paper:default',$2,$3,$4,'ACTIVE',$5,$6,$7,$8,$9,$10,$11::jsonb)
+                    """,
+                    position_id, order_id, decision.decision_id, decision.symbol, quantity, fill_price,
+                    decision.stop_price, decision.target_price, entry.fee, entry.entry_time_ms,
+                    json.dumps(payload),
+                )
+                await connection.execute(
+                    """
+                    insert into signal_lifecycle_events(signal_id, sequence_id, state, event_type, event_time_ms, payload)
+                    values($1,1,'ENTERED','FIRST_FILL',$2,$3::jsonb),
+                          ($1,2,'ACTIVE','ACTIVATE',$2,$3::jsonb)
+                    on conflict(signal_id, sequence_id) do nothing
+                    """,
+                    decision.decision_id, entry.entry_time_ms, json.dumps(payload),
+                )
+                new_cash = Decimal(str(account["cash_balance"])) - total_entry_cash
+                new_reserved = Decimal(str(account["reserved_cash"])) + decision.risk.risk_cash
+                active_notional = await connection.fetchval(
+                    """
+                    select coalesce(sum(quantity * entry_price), 0)
+                    from paper_positions
+                    where state in ('ENTERED','ACTIVE','PROTECTED','EXITING')
+                    """
+                )
+                await connection.execute(
+                    """
+                    update paper_accounts
+                    set cash_balance=$1, reserved_cash=$2, equity=$3, updated_at_ms=$4
+                    where account_id='paper:default'
+                    """,
+                    new_cash, new_reserved, new_cash + Decimal(str(active_notional or "0")), now_ms,
+                )
+        return {"status": "FILLED", "order_id": order_id, "position_id": position_id, "fill_id": fill_id}
+
+    async def close_paper_position(self, position: dict, fill, candle_time_ms: int, exit_payload: dict) -> dict:
+        """Atomically close an active Paper position after a closed-candle exit decision."""
+        pool = self._require_pool()
+        if fill.status != "CLOSED" or fill.fill_price is None:
+            return {"status": fill.status}
+        position_id = str(position["position_id"])
+        exit_fill_id = f"paper-fill:exit:{position_id}:{candle_time_ms}"
+        exit_price = fill.fill_price
+        quantity = Decimal(str(position["quantity"]))
+        entry_price = Decimal(str(position["entry_price"]))
+        entry_fee = Decimal(str(position["entry_fee"]))
+        exit_fee = fill.fee
+        net_pnl = (exit_price - entry_price) * quantity - entry_fee - exit_fee
+        risk_cash = Decimal(str((position.get("payload") or {}).get("risk_cash", "0")))
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                current = await connection.fetchrow(
+                    "select state from paper_positions where position_id=$1 for update", position_id
+                )
+                if current is None or current["state"] == "CLOSED":
+                    return {"status": "DUPLICATE_OR_CLOSED", "position_id": position_id}
+                account = await connection.fetchrow(
+                    "select cash_balance, reserved_cash, realized_pnl from paper_accounts where account_id='paper:default' for update"
+                )
+                if account is None:
+                    raise RuntimeError("paper account is not initialized")
+                await connection.execute(
+                    """
+                    insert into paper_fills(fill_id, order_id, symbol, quantity, price, fee, fill_time_ms, payload)
+                    values($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+                    on conflict(fill_id) do nothing
+                    """,
+                    exit_fill_id, position["order_id"], position["symbol"], quantity, exit_price, exit_fee,
+                    candle_time_ms, json.dumps({"side": "SELL", "fill_type": "EXIT", **exit_payload}),
+                )
+                await connection.execute(
+                    """
+                    update paper_orders set status='CLOSED', updated_at=now(), fees=fees+$2
+                    where order_id=$1
+                    """,
+                    position["order_id"], exit_fee,
+                )
+                await connection.execute(
+                    """
+                    update paper_positions
+                    set state='CLOSED', exit_price=$2, exit_fee=$3, realized_pnl=$4,
+                        closed_at_ms=$5, updated_at=now(), payload=payload || $6::jsonb
+                    where position_id=$1
+                    """,
+                    position_id, exit_price, exit_fee, net_pnl, candle_time_ms,
+                    json.dumps({"exit_reason": fill.exit_reason, "realized_r": str(net_pnl / risk_cash) if risk_cash > 0 else None}),
+                )
+                await connection.execute(
+                    "update risk_reservations set status='RELEASED', updated_at=now() where decision_id=$1 and status='CONSUMED'",
+                    position["decision_id"],
+                )
+                proceeds = exit_price * quantity - exit_fee
+                new_cash = Decimal(str(account["cash_balance"])) + proceeds
+                new_reserved = max(Decimal("0"), Decimal(str(account["reserved_cash"])) - risk_cash)
+                realized = Decimal(str(account["realized_pnl"])) + net_pnl
+                active_notional = await connection.fetchval(
+                    """
+                    select coalesce(sum(quantity * entry_price), 0)
+                    from paper_positions
+                    where state in ('ENTERED','ACTIVE','PROTECTED','EXITING')
+                    """
+                )
+                await connection.execute(
+                    """
+                    update paper_accounts set cash_balance=$1, reserved_cash=$2, equity=$3,
+                        realized_pnl=$4, updated_at_ms=$5 where account_id='paper:default'
+                    """,
+                    new_cash, new_reserved, new_cash + Decimal(str(active_notional or "0")), realized, int(time.time() * 1000),
+                )
+                event_payload = {**exit_payload, "realized_pnl": str(net_pnl), "exit_reason": fill.exit_reason}
+                await connection.execute(
+                    """
+                    insert into signal_lifecycle_events(signal_id, sequence_id, state, event_type, event_time_ms, payload)
+                    values($1,3,'EXITING','EXIT_REQUEST',$2,$3::jsonb),
+                          ($1,4,'CLOSED','CLOSED',$2,$3::jsonb)
+                    on conflict(signal_id, sequence_id) do nothing
+                    """,
+                    position["decision_id"], candle_time_ms, json.dumps(event_payload),
+                )
+        return {"status": "CLOSED", "position_id": position_id, "fill_id": exit_fill_id, "realized_pnl": str(net_pnl), "exit_reason": fill.exit_reason}
+
+    async def recover_stale_cycles(self, now_ms: int, stale_after_ms: int) -> list[str]:
+        pool = self._require_pool()
+        cutoff = now_ms - max(stale_after_ms, 60_000)
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                update cycle_runs
+                set status='FAILED', finished_at_ms=$1, error_count=error_count+1,
+                    summary=summary || jsonb_build_object(
+                        'recovered_as_stale', true,
+                        'recovered_at_ms', $1,
+                        'recovery_reason', 'PROCESS_RESTART_OR_CYCLE_TIMEOUT'
+                    )
+                where status='RUNNING' and started_at_ms < $2
+                returning cycle_id
+                """,
+                now_ms,
+                cutoff,
+            )
+        return [str(row["cycle_id"]) for row in rows]
 
     async def start_cycle(
         self,

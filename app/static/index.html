@@ -162,7 +162,7 @@
       </section>
 
       <div id="overviewView" class="view active">
-        <div class="feed-note"><strong>مصدر الأسعار:</strong> Binance public market data عبر WebSocket للتحديث اللحظي، مع fallback REST عند الانقطاع. الأسعار ليست أوامر تنفيذ، والقائمة تتضمن 25 زوجًا من أزواج USDT.</div>
+        <div id="sourceNote" class="feed-note"><strong>مصدر الأسعار:</strong> أسعار العرض تأتي من Binance WebSocket/REST العام ولا تمثل أوامر تنفيذ. مصدر Worker للتحليل يسجل داخل Cycle Summary؛ إذا ظهر Binance US فهو مصدر بديل رسمي مستقل وليس مطابقًا تلقائيًا لـ Binance.com.</div>
         <div class="grid">
           <section class="panel">
             <div class="panel-head"><div><h3 class="panel-title">السوق الحي — 25 زوجًا</h3><p class="panel-desc">أسعار لحظية عبر WebSocket؛ التغير والنطاق يظهران عند توفر بيانات REST العامة.</p></div><span id="marketUpdated" class="panel-meta">—</span></div>
@@ -214,7 +214,7 @@
   </div>
 
   <script>
-    const state = { tickers: [], orderView: 'all' };
+    const state = { tickers: [], orderView: 'all', summary: null };
     const DASHBOARD_SYMBOLS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','TRXUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','POLUSDT','LTCUSDT','BCHUSDT','ATOMUSDT','UNIUSDT','ETCUSDT','FILUSDT','NEARUSDT','APTUSDT','OPUSDT','ARBUSDT','SUIUSDT','INJUSDT','XLMUSDT'];
     const $ = (id) => document.getElementById(id);
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
@@ -222,11 +222,13 @@
     const fmtPrice = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 }) : n.toLocaleString('en-US', { maximumFractionDigits: 8 }); };
     const fmtPct = (value) => { if (value === null || value === undefined || value === '') return '—'; const n = Number(value); if (!Number.isFinite(n)) return '—'; return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; };
     const statusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = ['ENTER','FILLED','CLOSED','VALID'].includes(s) ? 'badge-green' : ['UNSAFE','REJECTED','CANCELLED','NEGATIVE_OR_UNCERTAIN'].includes(s) ? 'badge-red' : ['CANDIDATE','WATCH','OPEN','INSUFFICIENT_DATA'].includes(s) ? 'badge-amber' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
-    const cycleStatusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = s === 'COMPLETED' ? 'badge-green' : ['PARTIAL','RUNNING'].includes(s) ? 'badge-amber' : s === 'FAILED' ? 'badge-red' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
+    const cycleStatusBadge = (status) => { const s = String(status || 'UNKNOWN'); const cls = s === 'COMPLETED' ? 'badge-green' : ['PARTIAL','RUNNING','SKIPPED_LOCKED'].includes(s) ? 'badge-amber' : ['FAILED','FAILED_UNHANDLED'].includes(s) ? 'badge-red' : 'badge-blue'; return `<span class="badge ${cls}">${esc(s)}</span>`; };
     const stageLabel = { CYCLE_START:'بدء الدورة', POSTGRES_CONNECT:'اتصال PostgreSQL', REDIS_CONNECT:'اتصال Redis', BINANCE_SERVER_TIME:'وقت Binance', EXCHANGE_INFO:'معلومات الأزواج', SYMBOL_VALIDATE:'تحقق الرمز', CANDLE_FETCH:'جلب الشموع المغلقة', FEATURE_GATE:'بوابة البيانات والميزات', DECISION_EVALUATE:'تقييم القرار', CANDLE_PERSIST:'حفظ الشموع', DECISION_PERSIST:'حفظ القرار', PERSISTENCE:'التخزين', REDIS_PUBLISH:'نشر Redis', PAPER_EXECUTION:'Paper execution', CYCLE_UNHANDLED:'خطأ غير معالج' };
     const fmtDuration = (value) => value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-US')} ms`;
     const setText = (id, value) => { if ($(id)) $(id).textContent = value; };
-    async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const response = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
+    const tokenFromUrl = new URLSearchParams(location.search).get('dashboard_token');
+    if (tokenFromUrl) { localStorage.setItem('mkmoon_dashboard_token', tokenFromUrl); history.replaceState({}, document.title, location.pathname); }
+    async function getJson(url, timeoutMs = 12000) { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { const token = localStorage.getItem('mkmoon_dashboard_token'); const headers = { 'Accept': 'application/json' }; if (token) headers['Authorization'] = `Bearer ${token}`; const response = await fetch(url, { headers, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); } finally { clearTimeout(timer); } }
 
     let marketSocket = null;
     let marketReconnectTimer = null;
@@ -298,6 +300,7 @@
     async function loadSummary() {
       try {
         const data = await getJson('/api/dashboard/summary');
+        state.summary = data;
         setText('serviceMetric', data.service === 'online' ? 'Online' : '—');
         setText('envMetric', `${data.environment || '—'} · Paper`);
         setText('dbMetric', data.database === 'connected' ? 'Connected' : data.database || '—');
@@ -306,7 +309,10 @@
         setText('closedMetric', data.orders?.closed ?? 0);
         const worker = data.paper_worker || {};
         setText('workerMetric', worker.running ? 'Running' : worker.enabled ? 'Stopped' : 'Disabled');
-        setText('workerMetricSub', worker.last_cycle_status ? `آخر دورة: ${worker.last_cycle_status}` : 'بانتظار أول دورة');
+        const source = worker.last_cycle_data_source || data.worker_data_source || 'لم تبدأ دورة بعد';
+        setText('workerMetricSub', worker.last_cycle_status ? `آخر دورة: ${worker.last_cycle_status} · ${source}` : `بانتظار أول دورة · ${source}`);
+        const sourceNote = $('sourceNote');
+        if (sourceNote) sourceNote.innerHTML = `<strong>مصادر البيانات:</strong> العرض اللحظي من Binance WebSocket/REST العام، بينما Worker حلّل ${esc(data.worker_symbols ?? '—')} رمزًا من <span class="mono">${esc(source)}</span>. Binance US مصدر مستقل عن Binance.com، ولا توجد أوامر حية.`;
         if (data.live_trading_enabled !== false || data.trading_mode !== 'paper') document.querySelector('.mode-chip').innerHTML = '<span class="dot"></span> تحقق من وضع التشغيل';
       } catch (error) { setText('serviceMetric', 'خطأ'); setText('envMetric', 'تعذر جلب الملخص'); }
     }
@@ -341,7 +347,7 @@
       }
     }
     async function loadDecisions() {
-      try { const items = await getJson(`/api/decisions?limit=100&search=${encodeURIComponent(($('decisionSearch')?.value || '').trim())}`); renderDecisionTable(items, 'decisionsBox'); renderDecisionTable(items.slice(0, 6), 'decisionPreview'); setText('decisionCount', `${items.length} قرار`); }
+      try { const search = ($('decisionSearch')?.value || '').trim(); const items = await getJson(`/api/decisions?limit=100&search=${encodeURIComponent(search)}`); renderDecisionTable(items, 'decisionsBox'); renderDecisionTable(items.slice(0, 6), 'decisionPreview'); const total = state.summary?.recent_decisions; setText('decisionCount', search ? `${items.length} معروض · بحث` : `${total ?? items.length} قرار إجمالًا`); }
       catch (error) { $('decisionsBox').innerHTML = '<div class="error-box">تعذر قراءة القرارات من PostgreSQL.</div>'; $('decisionPreview').innerHTML = '<div class="empty">تعذر القراءة</div>'; }
     }
     async function loadOrders() {
@@ -365,8 +371,9 @@
       const reasonCounts = summary.reason_counts || {};
       const reasons = Object.entries(reasonCounts).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10).map(([key, value]) => `<span class="badge badge-amber">${esc(key)}: ${esc(value)}</span>`).join(' ') || '<span class="subtle">لا توجد أسباب مرفقة</span>';
       const events = data.events || [];
+      const source = summary.binance_data_source || 'غير مسجل';
       const eventRows = events.map((event) => { const metrics = event.metrics || {}; const metricText = Object.entries(metrics).filter(([key, value]) => value !== null && value !== undefined && !['code_version','config_version'].includes(key)).slice(0, 4).map(([key, value]) => `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`).join(' · '); const error = event.error_type ? ` ${event.error_type}: ${event.error_message || ''}` : ''; return `<tr><td>${esc(event.sequence_id)}</td><td>${fmtTime(event.event_time_ms)}</td><td>${esc(event.symbol || '—')}</td><td>${esc(stageLabel[event.stage] || event.stage)}</td><td>${statusBadge(event.status)}</td><td>${fmtDuration(event.duration_ms)}</td><td class="subtle">${esc([...(event.reason_codes || []), metricText, error].filter(Boolean).join(' · ') || '—')}</td></tr>`; }).join('');
-      $('cycleDetailBox').innerHTML = `<div class="panel-head"><div><h3 class="panel-title">تفاصيل الدورة <span class="mono">${esc(run.cycle_id)}</span></h3><p class="panel-desc">${fmtTime(run.started_at_ms)} → ${fmtTime(run.finished_at_ms)} · code ${esc(run.code_version)} · config ${esc(run.config_version)}</p></div><div>${cycleStatusBadge(run.status)}</div></div><div class="cycle-grid"><div class="cycle-stat"><span>الرموز المعالجة</span><strong>${esc(run.symbols_processed)} / ${esc(run.symbols_requested)}</strong></div><div class="cycle-stat"><span>القرارات</span><strong>${esc(run.decisions_count)}</strong></div><div class="cycle-stat"><span>أوامر منشأة</span><strong>${esc(run.orders_created)}</strong></div><div class="cycle-stat"><span>الأخطاء</span><strong class="${Number(run.error_count) ? 'cycle-error' : 'cycle-ok'}">${esc(run.error_count)}</strong></div></div><p class="panel-desc"><strong>أكثر أسباب القرار:</strong> ${reasons}</p><div class="table-wrap"><table><thead><tr><th>#</th><th>الوقت</th><th>الرمز</th><th>المرحلة</th><th>النتيجة</th><th>المدة</th><th>الأسباب والمقاييس</th></tr></thead><tbody>${eventRows || '<tr><td colspan="7" class="empty">لا توجد أحداث للدورة.</td></tr>'}</tbody></table></div>`;
+      $('cycleDetailBox').innerHTML = `<div class="panel-head"><div><h3 class="panel-title">تفاصيل الدورة <span class="mono">${esc(run.cycle_id)}</span></h3><p class="panel-desc">${fmtTime(run.started_at_ms)} → ${fmtTime(run.finished_at_ms)} · code ${esc(run.code_version)} · config ${esc(run.config_version)}</p><p class="panel-desc"><strong>مصدر بيانات Worker:</strong> <span class="mono">${esc(source)}</span></p></div><div>${cycleStatusBadge(run.status)}</div></div><div class="cycle-grid"><div class="cycle-stat"><span>الرموز المعالجة</span><strong>${esc(run.symbols_processed)} / ${esc(run.symbols_requested)}</strong></div><div class="cycle-stat"><span>القرارات</span><strong>${esc(run.decisions_count)}</strong></div><div class="cycle-stat"><span>أوامر منشأة</span><strong>${esc(run.orders_created)}</strong></div><div class="cycle-stat"><span>الأخطاء</span><strong class="${Number(run.error_count) ? 'cycle-error' : 'cycle-ok'}">${esc(run.error_count)}</strong></div></div><p class="panel-desc"><strong>أكثر أسباب القرار:</strong> ${reasons}</p><div class="table-wrap"><table><thead><tr><th>#</th><th>الوقت</th><th>الرمز</th><th>المرحلة</th><th>النتيجة</th><th>المدة</th><th>الأسباب والمقاييس</th></tr></thead><tbody>${eventRows || '<tr><td colspan="7" class="empty">لا توجد أحداث للدورة.</td></tr>'}</tbody></table></div>`;
     }
     async function loadCycleDetail(cycleId) {
       try { $('cycleDetailBox').innerHTML = '<div class="empty">جارٍ تحميل timeline…</div>'; renderCycleDetail(await getJson(`/api/cycles/${encodeURIComponent(cycleId)}`)); }

@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, ROUND_UP
 
 from app.core.models import RiskPlan
 
@@ -21,10 +21,22 @@ def floor_to_step(value: Decimal, step: Decimal) -> Decimal:
 
 
 def normalize_price(value: Decimal, tick_size: Decimal, direction: str = "down") -> Decimal:
+    if direction not in {"down", "up"}:
+        raise ValueError("direction must be down or up")
     if tick_size <= 0:
         return value
-    units = (value / tick_size).to_integral_value(rounding=ROUND_DOWN if direction == "down" else ROUND_DOWN)
+    rounding = ROUND_DOWN if direction == "down" else ROUND_UP
+    units = (value / tick_size).to_integral_value(rounding=rounding)
     return units * tick_size
+
+
+def _invalid_plan(entry_price: Decimal, stop_price: Decimal, target_price: Decimal, risk_pct: Decimal, reason: str) -> RiskPlan:
+    return RiskPlan(
+        risk_cash=Decimal("0"), risk_pct=risk_pct, entry_price=entry_price, stop_price=stop_price,
+        target_price=target_price, unit_risk=Decimal("1"), quantity=Decimal("0"),
+        effective_risk_cash=Decimal("0"), expected_cost_cash=Decimal("0"), effective_rr=Decimal("0"),
+        valid=False, reason_codes=[reason],
+    )
 
 
 def calculate_risk_plan(
@@ -42,21 +54,15 @@ def calculate_risk_plan(
     slippage_rate: Decimal,
     filters: RiskFilters,
 ) -> RiskPlan:
-    if equity <= 0 or entry_price <= 0 or stop_price <= 0 or target_price <= entry_price:
-        return RiskPlan(
-            risk_cash=Decimal("0"), risk_pct=risk_pct, entry_price=entry_price, stop_price=stop_price,
-            target_price=target_price, unit_risk=Decimal("1"), quantity=Decimal("0"),
-            effective_risk_cash=Decimal("0"), expected_cost_cash=Decimal("0"), effective_rr=Decimal("0"),
-            valid=False, reason_codes=["INVALID_PRICE_GEOMETRY"],
-        )
+    if equity <= 0 or entry_price <= 0 or stop_price <= 0 or target_price <= 0:
+        return _invalid_plan(entry_price, stop_price, target_price, risk_pct, "INVALID_PRICE_GEOMETRY")
+    if not stop_price < entry_price < target_price:
+        return _invalid_plan(entry_price, stop_price, target_price, risk_pct, "INVALID_PRICE_GEOMETRY")
+    if fee_rate < 0 or slippage_rate < 0:
+        return _invalid_plan(entry_price, stop_price, target_price, risk_pct, "INVALID_COST_ASSUMPTION")
     risk_cash = min(equity * risk_pct, remaining_daily_risk, remaining_portfolio_risk, symbol_risk_cap, cluster_risk_cap)
     if risk_cash <= 0:
-        return RiskPlan(
-            risk_cash=Decimal("0"), risk_pct=risk_pct, entry_price=entry_price, stop_price=stop_price,
-            target_price=target_price, unit_risk=Decimal("1"), quantity=Decimal("0"),
-            effective_risk_cash=Decimal("0"), expected_cost_cash=Decimal("0"), effective_rr=Decimal("0"),
-            valid=False, reason_codes=["RISK_LIMIT"],
-        )
+        return _invalid_plan(entry_price, stop_price, target_price, risk_pct, "RISK_LIMIT")
     price_risk = entry_price - stop_price
     cost_per_unit = entry_price * (fee_rate * Decimal("2") + slippage_rate * Decimal("2"))
     unit_risk = price_risk + cost_per_unit

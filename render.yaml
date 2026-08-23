@@ -16,6 +16,14 @@ services:
         value: require
       - key: POLL_INTERVAL_SECONDS
         value: "60"
+      - key: REQUEST_TIMEOUT_SECONDS
+        value: "20"
+      - key: CYCLE_TIMEOUT_SECONDS
+        value: "300"
+      - key: WORKER_CONCURRENCY
+        value: "8"
+      - key: WORKER_LOCK_TTL_SECONDS
+        value: "600"
       - key: TIMEZONE
         value: UTC
       - key: CANDLE_PERSISTENCE_ENABLED
@@ -26,53 +34,7 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: BINANCE_API_KEY
-        sync: false
-      - key: BINANCE_API_SECRET
-        sync: false
-      - key: SYMBOLS
-        value: BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT
-      - key: BINANCE_BASE_URL
-        value: https://api.binance.com
-      - key: BINANCE_DATA_BASE_URL
-        value: https://data-api.binance.vision
-      - key: BINANCE_FALLBACK_BASE_URL
-        value: https://api.binance.us
-      - key: RISK_PCT
-        value: "0.0025"
-      - key: MAX_DAILY_RISK_PCT
-        value: "0.01"
-      - key: MAX_PORTFOLIO_RISK_PCT
-        value: "0.01"
-  - type: worker
-    name: mkmoon-worker
-    runtime: python
-    buildCommand: pip install .
-    startCommand: python -m app.worker
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: TRADING_MODE
-        value: paper
-      - key: LIVE_TRADING_ENABLED
-        value: "false"
-      - key: DATABASE_SSL_MODE
-        value: require
-      - key: POLL_INTERVAL_SECONDS
-        value: "60"
-      - key: TIMEZONE
-        value: UTC
-      - key: CANDLE_PERSISTENCE_ENABLED
-        value: "true"
-      - key: CONFIG_PATH
-        value: configs/config.v1.yaml
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: BINANCE_API_KEY
-        sync: false
-      - key: BINANCE_API_SECRET
+      - key: DASHBOARD_ACCESS_TOKEN
         sync: false
       - key: SYMBOLS
         value: BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,TRXUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,POLUSDT,LTCUSDT,BCHUSDT,ATOMUSDT,UNIUSDT,ETCUSDT,FILUSDT,NEARUSDT,APTUSDT,OPUSDT,ARBUSDT,SUIUSDT,INJUSDT,XLMUSDT
