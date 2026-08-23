@@ -92,3 +92,12 @@
 [9]: https://github.com/mkkh01/Mkmoon/blob/main/docs/deployment_verification_2026-08-23.md "Deployment verification record"
 [10]: https://github.com/mkkh01/Mkmoon/blob/main/migrations/0006_paper_execution.sql "Paper execution schema migration"
 [11]: https://github.com/mkkh01/Mkmoon/blob/main/migrations/0007_performance_indexes.sql "Paper and audit performance indexes"
+
+
+## تحديث تدقيق الإنتاج بعد الإصدار 2dab6b1 وb7617b7
+
+آخر دورة مكتملة تم التحقق منها بعد النشر عالجت 25/25 رمزًا، وسجلت 25 قرارًا، و230 حدث تدقيق، منها 100 نجاح لجلب الشموع المغلقة، و25 تقييم قرار، و25 حفظ قرار، و25 نشر Redis، دون أي حدث ERROR. كانت النتيجة `WATCH=24` و`NO_TRADE=1` و`ENTER=0`.
+
+الأهم أن `SOLUSDT` وصل فعليًا إلى استراتيجية `BREAKOUT_RETEST` مكتملة بنسبة 8/8، وحصل على Quality Score قدره `79.60/100`. لم تُنشأ صفقة لأن القرار أوقفه بسبب `RR_TOO_LOW` وبوابة `EV_DISABLED_UNTIL_CALIBRATED` مع عينة EV تساوي صفرًا. هذه قرينة تشغيلية مهمة: المحرك والاستراتيجية والـQuality Score يعملون، والمنع الحالي معلن وآمن، وليس فشلًا في جلب البيانات أو توقفًا للمحركات.
+
+تظهر دورة سابقة أثناء سلسلة النشر أرقامًا جزئية مثل 10/25 و20/25. كانت هذه السجلات من عمليات بدأت قبل اكتمال deploy أو قُطعت أثناء إعادة التشغيل، وقد كانت النسخة السابقة تصنف الإلغاء بطريقة مضللة. بعد `2dab6b1` صار الإلغاء المسجل أثناء timeout/restart يُصنف `FAILED`، كما تختار Dashboard أحدث دورة `COMPLETED` عند عرض الملخص بدل دورة `RUNNING`. لذلك يجب اعتماد الدورة المكتملة فقط في التقييم التشغيلي.
