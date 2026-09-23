@@ -62,7 +62,7 @@ class Position:
     __slots__ = ("id", "symbol", "tier", "side", "order_id", "entry_t", "entry_px",
                  "stop", "locked_stop", "locked", "tp", "R", "cancel_line", "atr_m",
                  "fill_bar", "fill_bar_h", "fill_bar_l", "mfe", "mae", "amb",
-                 "exit_t", "exit_px", "exit_reason", "bar_t", "bar_h", "bar_l",
+                 "exit_t", "exit_px", "exit_reason", "bar_t", "bar_o", "bar_h", "bar_l",
                  "bar_c", "expire_t", "setup", "lock_bar_done")
 
     def __init__(self, pid, symbol, tier, order, entry_px, now_ms, bar_open_ms):
@@ -94,6 +94,7 @@ class Position:
         self.exit_px = None
         self.exit_reason = None
         self.bar_t = bar_open_ms
+        self.bar_o = NAN
         self.bar_h = NAN
         self.bar_l = NAN
         self.bar_c = NAN
@@ -342,9 +343,30 @@ class PaperTrader:
         # carry the fill-bar extremes tracked on the order (§21 fill-bar rules)
         pos.fill_bar_h = o.bar_h
         pos.fill_bar_l = o.bar_l
+        pos.bar_o = o.bar_o if not math.isnan(o.bar_o) else px
         pos.bar_h = o.bar_h
         pos.bar_l = o.bar_l
         pos.bar_c = o.bar_c
+        # §21 fill-bar semantics: the fill bar ran through the ORDER path — seed
+        # MFE/MAE from its extremes and evaluate the lock trigger here (engine:
+        # phase-B locked stop is active ON the locking bar = retro).
+        side = pos.side
+        if not math.isnan(o.bar_h) and not math.isnan(o.bar_l):
+            if side == 1:
+                fav_m = (o.bar_h - px) / pos.R
+                adv_m = (o.bar_l - px) / pos.R
+                tp_touch = o.bar_h >= pos.tp
+            else:
+                fav_m = (px - o.bar_l) / pos.R
+                adv_m = (px - o.bar_h) / pos.R
+                tp_touch = o.bar_l <= pos.tp
+            pos.mfe = max(pos.mfe, fav_m)
+            pos.mae = min(pos.mae, adv_m)
+            if tp_touch:
+                pos.amb += 1          # fill-bar TP touch not credited (§21)
+        if (not pos.locked) and pos.mfe >= self.cfg["mfe_trig_r"]:
+            pos.locked = True
+            pos.lock_bar_done = pos.bar_t
         self.positions[o.symbol] = pos
         await self._notify("trade_opened", {
             "trade_id": pos.id, "order_id": o.id, "symbol": o.symbol, "tier": o.tier,
@@ -370,9 +392,12 @@ class PaperTrader:
             if p.exit_t is not None:
                 return
             p.bar_t = bar_open
+            p.bar_o = NAN
             p.bar_h = NAN
             p.bar_l = NAN
             p.bar_c = NAN
+        if math.isnan(p.bar_o):
+            p.bar_o = px
         p.bar_h = px if math.isnan(p.bar_h) else max(p.bar_h, px)
         p.bar_l = px if math.isnan(p.bar_l) else min(p.bar_l, px)
         p.bar_c = px
@@ -433,12 +458,13 @@ class PaperTrader:
             hit = (p.bar_l <= active_stop) if side == 1 else (p.bar_h >= active_stop)
             if hit:
                 # engine: sl at locked stop unless an earlier phase-A event existed
+                # (exit price = worst of level vs bar OPEN — engine gap rule)
                 hit_stop0 = (p.bar_l <= p.stop) if side == 1 else (p.bar_h >= p.stop)
                 if hit_stop0:
-                    await self._close(p, p.bar_l if side == 1 else p.bar_h, now_ms,
+                    await self._close(p, p.bar_o, now_ms,
                                       "sl", stop_level=p.stop)
                 else:
-                    await self._close(p, p.bar_l if side == 1 else p.bar_h, now_ms,
+                    await self._close(p, p.bar_o, now_ms,
                                       "sl_lock", stop_level=active_stop)
                 return
         # 3) time stop: exit at close of the last bar inside the 24h window
@@ -454,7 +480,7 @@ class PaperTrader:
                 # retro: locked stop applies to THIS bar too
                 hit = (p.bar_l <= p.locked_stop) if side == 1 else (p.bar_h >= p.locked_stop)
                 if hit:
-                    await self._close(p, p.bar_l if side == 1 else p.bar_h, now_ms,
+                    await self._close(p, p.bar_o, now_ms,
                                       "sl_lock", stop_level=p.locked_stop)
 
     # ---------------------------------------------------------------- close

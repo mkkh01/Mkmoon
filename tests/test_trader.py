@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """Unit tests for the paper trader (pure python — no numpy/pandas).
 
+Y_LOCK12 geometry (R=1.3 in these fixtures): TP = entry+1.7R = 102.41,
+locked stop = entry+1.2R = 101.76, lock trigger MFE 1.5R @ 102.15.
+
 Covers the critical validated semantics (§21 pessimistic protocol):
   * same-bar touch + close beyond edge -> CANCEL (pessimistic), no fill
   * fill-bar TP touch NOT credited; SL on fill bar active
-  * MFE 0.35R -> lock (entry+0.30R) with retro stop on the locking bar
+  * MFE 1.5R -> deep lock (entry+1.2R) with retro stop on the locking bar
   * early abort on 1m close beyond FVG edge
   * TP exit + percent-compounding equity
   * FILL_MODE=instant fills at the touch tick
@@ -58,20 +61,23 @@ async def scenario_cancel_same_bar():
 
 
 async def scenario_fill_bar_lock_retro():
-    """Fill bar rallies hard (MFE>=0.35R) but first wicked below the locked
-    stop -> engine retro-stop on the locking bar (pessimistic)."""
+    """Fill bar spikes past the 1.5R trigger AND the 1.7R TP (TP not credited in
+    the fill bar), but first wicked below the deep locked stop (entry+1.2R) ->
+    engine retro-stop on the locking bar (pessimistic) -> sl_lock."""
     t = PaperTrader()
-    s = mk_setup(sweep_low=99.0)      # limit 100.2 stop 98.9 R 1.3 tp 101.37 lock 100.59
+    s = mk_setup(sweep_low=99.0)   # limit 100.2 stop 98.9 R 1.3
+    # tp 102.41 | locked 101.76 | trigger 102.15
     o = await t.on_setup(s, "TESTUSDT", "A", T0)
     assert o is not None
     b0 = T0 // 60_000
     await t.on_price("TESTUSDT", 100.15, 100.17, T0, b0)             # touch (low 100.15)
-    await t.on_price("TESTUSDT", 101.5, 101.52, T0 + 30_000, b0)     # high 101.5 (MFE 1.0R)
+    await t.on_price("TESTUSDT", 102.5, 102.52, T0 + 30_000, b0)     # >= TP & trigger
     await t.on_price("TESTUSDT", 100.3, 100.32, T0 + 61_000, b0 + 1)  # rollover -> decide+retro
     pos = list(t.positions.values())
     assert len(pos) == 1
     p = pos[0]
-    assert p.exit_t is not None, "retro lock stop should fire on the locking bar"
+    assert p.amb >= 1, "fill-bar TP touch must not be credited"
+    assert p.exit_t is not None, "retro deep-lock stop should fire on the locking bar"
     assert p.exit_reason == "sl_lock", p.exit_reason
     assert p.locked
     print("PASS scenario_fill_bar_lock_retro")
@@ -82,12 +88,12 @@ async def scenario_abort():
     s = mk_setup(sweep_low=99.0)
     o = await t.on_setup(s, "TESTUSDT", "A", T0)
     b0 = T0 // 60_000
-    # bar0: touch + close ABOVE the edge -> valid fill at 100.2
+    # bar0: touch + close ABOVE the edge -> valid fill at 100.2 (quiet: no lock)
     await t.on_price("TESTUSDT", 100.15, 100.17, T0, b0)
-    await t.on_price("TESTUSDT", 100.1, 100.12, T0 + 50_000, b0)
+    await t.on_price("TESTUSDT", 100.4, 100.42, T0 + 50_000, b0)
     await t.on_price("TESTUSDT", 100.2, 100.22, T0 + 61_000, b0 + 1)   # fill decides
     p = [p for p in t.positions.values() if p.exit_t is None][0]
-    # bar1 closes below cancel_line (100.0) without touching stop/tp
+    # bar1 closes below cancel_line (100.0) without touching stop/tp/lock
     await t.on_price("TESTUSDT", 99.8, 99.82, T0 + 70_000, b0 + 1)
     await t.on_price("TESTUSDT", 100.2, 100.22, T0 + 121_000, b0 + 2)  # bar1 closes
     assert p.exit_t is not None and p.exit_reason == "abort", p.exit_reason
@@ -99,19 +105,24 @@ async def scenario_tp_and_equity():
     s = mk_setup(sweep_low=99.0)
     o = await t.on_setup(s, "TESTUSDT", "A", T0)
     b0 = T0 // 60_000
-    # bar0: quiet fill (high 100.4 < lock 100.655) -> no lock, no TP
+    # bar0: quiet fill (high 100.8 -> MFE 0.46R: no lock; low 100.15: no stop)
     await t.on_price("TESTUSDT", 100.15, 100.17, T0, b0)
-    await t.on_price("TESTUSDT", 100.4, 100.42, T0 + 50_000, b0)
-    # bar1 opens ABOVE the locked stop (engine retro-lock is in-bar pessimistic):
-    # fill decides on the rollover tick; bar1 low must stay > 100.59
-    await t.on_price("TESTUSDT", 100.7, 100.72, T0 + 61_000, b0 + 1)
+    await t.on_price("TESTUSDT", 100.8, 100.82, T0 + 30_000, b0)
+    # bar1: gradual climb — lows stay ABOVE the 1.2R locked stop (101.76),
+    # highs stay BELOW the 1.5R trigger (102.15): no lock bar yet
+    await t.on_price("TESTUSDT", 101.0, 101.02, T0 + 70_000, b0 + 1)   # fill decides
     p = [p for p in t.positions.values() if p.exit_t is None][0]
-    await t.on_price("TESTUSDT", 100.7, 100.72, T0 + 70_000, b0 + 1)   # lock at 0.35R
-    # bar2: reach TP 101.37
-    await t.on_price("TESTUSDT", 101.4, 101.42, T0 + 130_000, b0 + 2)
+    await t.on_price("TESTUSDT", 101.85, 101.87, T0 + 100_000, b0 + 1)
+    # bar2: trigger bar (high 102.3 = +1.62R) with low 101.88 ABOVE the lock
+    # -> engine phase-B: no retro stop on the locking bar -> lock survives
+    await t.on_price("TESTUSDT", 101.88, 101.90, T0 + 130_000, b0 + 2)
+    await t.on_price("TESTUSDT", 102.3, 102.32, T0 + 150_000, b0 + 2)  # trigger -> lock
+    # bar3: reach TP 102.41 without touching the 101.76 lock
+    await t.on_price("TESTUSDT", 101.8, 101.82, T0 + 190_000, b0 + 3)
+    await t.on_price("TESTUSDT", 102.45, 102.47, T0 + 200_000, b0 + 3)
     assert p.exit_t is not None and p.exit_reason == "tp", p.exit_reason
     row = [r for r in t.closed if r["trade_id"] == p.id][0]
-    assert row["net_R"] > 0.7, row["net_R"]
+    assert row["net_R"] > 1.2, row["net_R"]          # 1.7R minus ~17bps costs
     assert t.wins == 1
     assert abs(t.equity - 100.0 * (1 + 0.01 * row["net_R"])) < 1e-9
     print(f"PASS scenario_tp_and_equity  net_R={row['net_R']:+.3f} equity={t.equity:.4f}")

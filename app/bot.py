@@ -89,14 +89,16 @@ class Bot:
         sym = payload.get("symbol", "")
         if ev == "order_placed":
             r_pct = payload.get("risk_pct", 1.0)
-            tp_pct = payload.get("tp_pct", 0.9)
+            tp_pct = payload.get("tp_pct", 1.7)
+            lock_pct = r_pct * C.CFG["lock_r"]
+            trig_pct = r_pct * C.CFG["mfe_trig_r"]
             txt = (
                 f"🔔 <b>توصية صفقة جديدة</b>{tier_ar}\n"
                 f"{sym} | {side_ar} | {payload.get('ctype','').upper()}\n"
                 f"الدخول (أمر معلق): {_fmt_px(payload.get('limit'))}\n"
                 f"الوقف: {_fmt_px(payload.get('stop'))} ({-r_pct}% من رأس المال)\n"
-                f"الهدف: {_fmt_px(payload.get('tp'))} (+{tp_pct}% ≈ +0.9R)\n"
-                f"القفل الآمن: +0.30R عند تجاوز 0.35R\n"
+                f"الهدف: {_fmt_px(payload.get('tp'))} (+{tp_pct}% ≈ +{C.CFG['tp_r']}R)\n"
+                f"القفل الآمن: +{lock_pct}% (+{C.CFG['lock_r']}R) عند تجاوز +{trig_pct}% (+{C.CFG['mfe_trig_r']}R)\n"
                 f"صلاحية الأمر: 6 ساعات"
             )
             await self._send_html(txt)
