@@ -1,0 +1,4 @@
+# Mkmoon production runtime — intentionally minimal (no pandas/numpy).
+aiohttp>=3.9
+asyncpg>=0.29
+redis>=5.0
