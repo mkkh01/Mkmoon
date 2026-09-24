@@ -89,16 +89,18 @@ class Bot:
         sym = payload.get("symbol", "")
         if ev == "order_placed":
             r_pct = payload.get("risk_pct", 1.0)
-            tp_pct = payload.get("tp_pct", 1.7)
-            lock_pct = r_pct * C.CFG["lock_r"]
-            trig_pct = r_pct * C.CFG["mfe_trig_r"]
+            leg_lines = []
+            for lg in C.CFG.get("legs") or ():
+                w = float(lg.get("weight", 1.0))
+                leg_lines.append(
+                    f"{lg['ar']} ({w:.0%}): هدف +{lg['tp_r']}R (+{r_pct*w*lg['tp_r']:.2f}%)"
+                    f" — قفل +{lg['lock_r']}R عند +{lg['mfe_trig_r']}R")
             txt = (
                 f"🔔 <b>توصية صفقة جديدة</b>{tier_ar}\n"
                 f"{sym} | {side_ar} | {payload.get('ctype','').upper()}\n"
                 f"الدخول (أمر معلق): {_fmt_px(payload.get('limit'))}\n"
                 f"الوقف: {_fmt_px(payload.get('stop'))} ({-r_pct}% من رأس المال)\n"
-                f"الهدف: {_fmt_px(payload.get('tp'))} (+{tp_pct}% ≈ +{C.CFG['tp_r']}R)\n"
-                f"القفل الآمن: +{lock_pct}% (+{C.CFG['lock_r']}R) عند تجاوز +{trig_pct}% (+{C.CFG['mfe_trig_r']}R)\n"
+                + "\n".join(leg_lines) + "\n"
                 f"صلاحية الأمر: 6 ساعات"
             )
             await self._send_html(txt)
@@ -107,7 +109,8 @@ class Bot:
                 f"✅ <b>تم فتح صفقة</b>{tier_ar}\n"
                 f"{sym} | {side_ar} | {payload['trade_id']}\n"
                 f"سعر الدخول: {_fmt_px(payload['entry_px'])}\n"
-                f"الوقف: {_fmt_px(payload['stop'])} | الهدف: {_fmt_px(payload['tp'])}\n"
+                f"الوقف: {_fmt_px(payload['stop'])}\n"
+                f"{payload.get('legs_txt', 'الهدف: ' + _fmt_px(payload['tp']))}\n"
                 f"أُبلغ بالدخول لحظة التعبئة — سأتابعها حتى النهاية مع ذكر السبب."
             )
             await self._send_html(txt)
@@ -116,8 +119,9 @@ class Bot:
             net = payload.get("net_R", 0.0)
             emoji = "📗" if net > 0 else "📕"
             pnl_pct = net * payload.get("risk_pct", C.CFG["risk_pct"])
+            leg_ar = payload.get("leg_ar", "")
             txt = (
-                f"{emoji} <b>إغلاق صفقة — {reason}</b>{tier_ar}\n"
+                f"{emoji} <b>إغلاق صفقة — {reason}</b>{(' — ' + leg_ar) if leg_ar else ''}{tier_ar}\n"
                 f"{sym} | {side_ar} | {payload['trade_id']}\n"
                 f"دخول {_fmt_px(payload['entry_px'])} → خروج {_fmt_px(payload['exit_px'])}\n"
                 f"النتيجة: {net:+.3f}R ({pnl_pct:+.2f}% من رأس المال)\n"

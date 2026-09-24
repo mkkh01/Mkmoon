@@ -63,25 +63,34 @@ class Position:
                  "stop", "locked_stop", "locked", "tp", "R", "cancel_line", "atr_m",
                  "fill_bar", "fill_bar_h", "fill_bar_l", "mfe", "mae", "amb",
                  "exit_t", "exit_px", "exit_reason", "bar_t", "bar_o", "bar_h", "bar_l",
-                 "bar_c", "expire_t", "setup", "lock_bar_done")
+                 "bar_c", "expire_t", "setup", "lock_bar_done",
+                 "leg", "leg_ar", "mfe_trig_r", "lock_r", "risk_pct")
 
-    def __init__(self, pid, symbol, tier, order, entry_px, now_ms, bar_open_ms):
+    def __init__(self, pid, symbol, tier, order, entry_px, now_ms, bar_open_ms,
+                 leg=None):
         cfg = C.CFG
+        leg = leg or {}
         self.id = pid
         self.symbol = symbol
         self.tier = tier
         self.side = order.side
         self.order_id = order.id
+        self.leg = leg.get("id", "")
+        self.leg_ar = leg.get("ar", "")
+        self.mfe_trig_r = float(leg.get("mfe_trig_r", cfg["mfe_trig_r"]))
+        self.lock_r = float(leg.get("lock_r", cfg["lock_r"]))
+        self.risk_pct = cfg["risk_pct"] * float(leg.get("weight", 1.0))
         self.entry_t = bar_open_ms          # engine: entry_t = 1m bar open of the fill bar
         self.entry_px = entry_px
         self.stop = order.stop0
-        self.locked_stop = entry_px + (cfg["lock_r"] * order.R0 if order.side == 1
-                                       else -cfg["lock_r"] * order.R0)
+        self.locked_stop = entry_px + (self.lock_r * order.R0 if order.side == 1
+                                       else -self.lock_r * order.R0)
         self.locked = False
         self.lock_bar_done = -1
         self.R = order.R0
-        self.tp = entry_px + (cfg["tp_r"] * order.R0 if order.side == 1
-                              else -cfg["tp_r"] * order.R0)
+        tp_r = float(leg.get("tp_r", cfg["tp_r"]))
+        self.tp = entry_px + (tp_r * order.R0 if order.side == 1
+                              else -tp_r * order.R0)
         self.cancel_line = order.cancel_line
         self.atr_m = order.setup["atr_mss"]
         self.fill_bar = bar_open_ms
@@ -206,7 +215,7 @@ class PaperTrader:
             return None
 
         # one active trade / order chain per symbol (validated busy rule)
-        if self.positions.get(symbol) and self.positions[symbol].exit_t is None:
+        if any(p.symbol == symbol and p.exit_t is None for p in self.positions.values()):
             return None
         bu = self.busy_until.get(symbol, -1)
         if setup["ord_t"] <= bu:
@@ -253,8 +262,8 @@ class PaperTrader:
         for o in [o for o in self.orders.values()
                   if o.symbol == symbol and o.status == "resting"]:
             await self._order_tick(o, bid, ask, now_ms, last_minute_bucket)
-        p = self.positions.get(symbol)
-        if p is not None and p.exit_t is None:
+        for p in [p for p in self.positions.values()
+                  if p.symbol == symbol and p.exit_t is None]:
             await self._position_tick(p, bid, ask, now_ms, last_minute_bucket)
 
     async def _order_tick(self, o, bid, ask, now_ms, bucket):
@@ -339,48 +348,60 @@ class PaperTrader:
             self.n_cancels += 1
             await self._persist("order", {"order_id": other.id, "status": "cancelled",
                                           "closed_t": bar_open_ms})
-        pos = Position(self._next_pid(), o.symbol, o.tier, o, px, bar_open_ms, bar_open_ms)
-        # carry the fill-bar extremes tracked on the order (§21 fill-bar rules)
-        pos.fill_bar_h = o.bar_h
-        pos.fill_bar_l = o.bar_l
-        pos.bar_o = o.bar_o if not math.isnan(o.bar_o) else px
-        pos.bar_h = o.bar_h
-        pos.bar_l = o.bar_l
-        pos.bar_c = o.bar_c
-        # §21 fill-bar semantics: the fill bar ran through the ORDER path — seed
-        # MFE/MAE from its extremes and evaluate the lock trigger here (engine:
-        # phase-B locked stop is active ON the locking bar = retro).
-        side = pos.side
-        if not math.isnan(o.bar_h) and not math.isnan(o.bar_l):
-            if side == 1:
-                fav_m = (o.bar_h - px) / pos.R
-                adv_m = (o.bar_l - px) / pos.R
-                tp_touch = o.bar_h >= pos.tp
-            else:
-                fav_m = (px - o.bar_l) / pos.R
-                adv_m = (px - o.bar_h) / pos.R
-                tp_touch = o.bar_l <= pos.tp
-            pos.mfe = max(pos.mfe, fav_m)
-            pos.mae = min(pos.mae, adv_m)
-            if tp_touch:
-                pos.amb += 1          # fill-bar TP touch not credited (§21)
-        if (not pos.locked) and pos.mfe >= self.cfg["mfe_trig_r"]:
-            pos.locked = True
-            pos.lock_bar_done = pos.bar_t
-        self.positions[o.symbol] = pos
+        legs = C.CFG.get("legs") or ({"id": "", "ar": "", "weight": 1.0},)
+        created = []
+        for leg in legs:
+            pos = Position(self._next_pid(), o.symbol, o.tier, o, px,
+                           bar_open_ms, bar_open_ms, leg=leg)
+            # carry the fill-bar extremes tracked on the order (§21 fill-bar rules)
+            pos.fill_bar_h = o.bar_h
+            pos.fill_bar_l = o.bar_l
+            pos.bar_o = o.bar_o if not math.isnan(o.bar_o) else px
+            pos.bar_h = o.bar_h
+            pos.bar_l = o.bar_l
+            pos.bar_c = o.bar_c
+            # §21 fill-bar semantics: the fill bar ran through the ORDER path — seed
+            # MFE/MAE from its extremes and evaluate the lock trigger here (engine:
+            # phase-B locked stop is active ON the locking bar = retro).
+            side = pos.side
+            if not math.isnan(o.bar_h) and not math.isnan(o.bar_l):
+                if side == 1:
+                    fav_m = (o.bar_h - px) / pos.R
+                    adv_m = (o.bar_l - px) / pos.R
+                    tp_touch = o.bar_h >= pos.tp
+                else:
+                    fav_m = (px - o.bar_l) / pos.R
+                    adv_m = (px - o.bar_h) / pos.R
+                    tp_touch = o.bar_l <= pos.tp
+                pos.mfe = max(pos.mfe, fav_m)
+                pos.mae = min(pos.mae, adv_m)
+                if tp_touch:
+                    pos.amb += 1          # fill-bar TP touch not credited (§21)
+            if (not pos.locked) and pos.mfe >= pos.mfe_trig_r:
+                pos.locked = True
+                pos.lock_bar_done = pos.bar_t
+            self.positions[f"{o.symbol}#{pos.leg or 'main'}"] = pos
+            created.append(pos)
+            await self._persist("trade", {
+                "trade_id": pos.id, "order_id": o.id, "symbol": o.symbol,
+                "tier": pos.tier, "side": pos.side, "entry_t": pos.entry_t,
+                "entry_px": px, "stop": pos.stop, "locked_stop": pos.locked_stop,
+                "tp": pos.tp, "R": pos.R, "leg": pos.leg, "leg_ar": pos.leg_ar,
+                "risk_pct": pos.risk_pct,
+                "status": "open", "signal_t": o.setup["signal_t"],
+                "ctype": o.setup["ctype"],
+            })
+        legs_txt = " | ".join(
+            f"{p.leg_ar} {p.tp:+.4g} (قفل {p.locked_stop:+.4g})" for p in created)
         await self._notify("trade_opened", {
-            "trade_id": pos.id, "order_id": o.id, "symbol": o.symbol, "tier": o.tier,
-            "side": pos.side, "entry_px": px, "entry_t": pos.entry_t,
-            "stop": pos.stop, "tp": pos.tp, "R": pos.R,
+            "trade_id": "+".join(p.id for p in created), "order_id": o.id,
+            "symbol": o.symbol, "tier": o.tier,
+            "side": created[0].side, "entry_px": px, "entry_t": created[0].entry_t,
+            "stop": created[0].stop, "tp": created[-1].tp, "R": created[0].R,
             "risk_pct": self.cfg["risk_pct"],
-            "tp_pct": self.cfg["risk_pct"] * self.cfg["tp_r"],
+            "tp_pct": self.cfg["risk_pct"] * float(C.CFG.get("legs", [{}])[-1].get("tp_r", 1.0)),
             "ctype": o.setup["ctype"],
-        })
-        await self._persist("trade", {
-            "trade_id": pos.id, "order_id": o.id, "symbol": o.symbol, "tier": pos.tier,
-            "side": pos.side, "entry_t": pos.entry_t, "entry_px": px,
-            "stop": pos.stop, "locked_stop": pos.locked_stop, "tp": pos.tp, "R": pos.R,
-            "status": "open", "signal_t": o.setup["signal_t"], "ctype": o.setup["ctype"],
+            "legs_txt": legs_txt,
         })
 
     # --------------------------------------------------------- position tick
@@ -428,7 +449,7 @@ class PaperTrader:
                 return
 
         # --- MFE lock trigger (instant at the touch tick; retro at bar close) ---
-        if (not p.locked) and p.mfe >= self.cfg["mfe_trig_r"]:
+        if (not p.locked) and p.mfe >= p.mfe_trig_r:
             p.locked = True
             p.lock_bar_done = p.bar_t
 
@@ -475,7 +496,7 @@ class PaperTrader:
         # keep MFE in sync with bar extremes (retro lock for slow feeds)
         if not p.locked:
             bar_fav = ((p.bar_h - p.entry_px) if side == 1 else (p.entry_px - p.bar_l)) / p.R
-            if not math.isnan(bar_fav) and bar_fav >= self.cfg["mfe_trig_r"]:
+            if not math.isnan(bar_fav) and bar_fav >= p.mfe_trig_r:
                 p.locked = True
                 # retro: locked stop applies to THIS bar too
                 hit = (p.bar_l <= p.locked_stop) if side == 1 else (p.bar_h >= p.locked_stop)
@@ -506,8 +527,8 @@ class PaperTrader:
         p.exit_px = exit_px
         p.exit_reason = reason
 
-        # virtual percent-compounding equity (§23 fixed-fractional, 1% risk)
-        self.equity *= (1.0 + (cfg["risk_pct"] / 100.0) * net_R)
+        # virtual percent-compounding equity (§23 fixed-fractional, per-leg risk)
+        self.equity *= (1.0 + (p.risk_pct / 100.0) * net_R)
         self.peak_equity = max(self.peak_equity, self.equity)
         dd = (self.peak_equity - self.equity) / self.peak_equity * 100.0
         self.max_dd_pct = max(self.max_dd_pct, dd)
@@ -529,6 +550,7 @@ class PaperTrader:
             "equity_pct": self.equity, "locked": p.locked,
             "signal_t": p.setup["signal_t"], "ctype": p.setup["ctype"],
             "session": p.setup["session"], "status": "closed",
+            "leg": p.leg, "leg_ar": p.leg_ar, "risk_pct": p.risk_pct,
         }
         self.closed.append(row)
         if len(self.closed) > 300:
@@ -549,13 +571,14 @@ class PaperTrader:
 
     def mark_price(self, symbol, px):
         """Mark-to-market PnL% of open position (informational)."""
-        p = self.positions.get(symbol)
-        if p is None or p.exit_t is not None or px is None:
+        p = next((p for p in self.positions.values()
+                  if p.symbol == symbol and p.exit_t is None), None)
+        if p is None or px is None:
             return None
         R = p.R
         fav = (px - p.entry_px) / R if p.side == 1 else (p.entry_px - px) / R
         return {"trade_id": p.id, "symbol": symbol, "side": p.side, "tier": p.tier,
                 "entry_px": p.entry_px, "px": px, "pnl_R": round(fav, 3),
-                "pnl_pct": round(fav * self.cfg["risk_pct"], 3),
+                "pnl_pct": round(fav * p.risk_pct, 3),
                 "stop": p.locked_stop if p.locked else p.stop, "tp": p.tp,
-                "entry_t": p.entry_t, "locked": p.locked}
+                "entry_t": p.entry_t, "locked": p.locked, "leg_ar": p.leg_ar}

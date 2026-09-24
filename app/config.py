@@ -2,19 +2,21 @@
 """
 Mkmoon — configuration & LOCKED strategy parameters.
 
-Strategy: ICT-DAY-15M-SLM-02 (candidate "Y_LOCK12") — winner of THE 1.0-1.7R
-CHALLENGE: winners land at +1.0..+1.7R net (avg +1.32R, 92% in band) while
-expectancy stays positive on 15/15 pairs and every year incl. the 2022 bear
-(blind-OOS exp +0.259R vs +0.052R for the retired Y_BAL35 exits).
-Entry/detection rules identical to ICT-DAY-15M-SLM-01 (fully validated);
-exit policy re-optimized under the declared challenge protocol
-(tests/challenge_sweep.py). DO NOT tune live; frozen for paper validation.
+Strategy: ICT-DAY-15M-SLM-03 (candidate "M_DUAL") — MERGED dual-leg exits:
+one entry -> two half-positions (50/50 risk):
+  ⚡ FAST   leg: lock +0.30R @ 0.35R, TP +0.55R  (blind-OOS WR ~70%, avg win +0.18R)
+  🎯 TANGIBLE leg: lock +0.85R @ 1.00R, TP +1.05R (wins land +0.71..+1.0R net;
+     ~27% of entries = ~1-2 tangible 0.7-1.0R winners per day)
+Merged expectancy +0.058R per 1% risk (blind OOS 2021-22/2025-26, 15 pairs).
+Entry/detection rules identical to ICT-DAY-15M-SLM-01 (fully validated).
+Built from the measured win-size x win-rate frontier (tests/c3_merge.py).
+DO NOT tune live; frozen for paper validation.
 """
 import os
 
 APP_NAME = "Mkmoon"
 VERSION = "1.0.0"
-STRATEGY_ID = "ICT-DAY-15M-SLM-02 / Y_LOCK12"
+STRATEGY_ID = "ICT-DAY-15M-SLM-03 / M_DUAL"
 
 # ---------------------------------------------------------------- timeframes --
 TF_MS = {"1m": 60_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
@@ -40,11 +42,10 @@ BREAK_DELTA_ATR = 0.02   # structure break buffer (delta)
 SWEEP_PEN_ATR = 0.02     # sweep penetration beyond level
 AMPLITUDE_MIN_ATR = 0.50 # external-swing amplitude filter
 
-# ----------------------------------------------------- LOCKED config Y_LOCK12 --
-# (challenge winner: avg net win +1.32R in [1.0-1.7]R band, TP 1.7R in band,
-#  15/15 pairs + all years positive on blind OOS 2021-22/2025-26)
+# -------------------------------------------------------- MERGED config M_DUAL --
+# (dual-leg exits, see tests/c3_merge.py: 50/50 FAST + TANGIBLE halves)
 CFG = {
-    "cid": "Y_LOCK12",
+    "cid": "M_DUAL",
     # ---- detection gates (run_grid.filter_setups) ----
     "require_sweep": True,
     "require_disp": False,
@@ -68,11 +69,19 @@ CFG = {
     "max_r_pct": 3.0,
     "sessions": "no_asia",
     "tp_mode": "fixed",
-    "tp_r": 1.7,
     "inv_atr": 0.0,              # cancel line = FVG edge exactly
     "early_abort": True,         # 1m close beyond FVG edge
-    "mfe_trig_r": 1.5,          # MFE >= 1.5R  -> lock
-    "lock_r": 1.20,              # stop -> entry + 1.20R (deep profit lock)
+    # ---- M_DUAL: one entry -> two half-position exit profiles ----
+    "legs": (
+        {"id": "F", "ar": "⚡ سريع", "tp_r": 0.55, "mfe_trig_r": 0.35,
+         "lock_r": 0.30, "weight": 0.5},
+        {"id": "T", "ar": "🎯 ملموس", "tp_r": 1.05, "mfe_trig_r": 1.00,
+         "lock_r": 0.85, "weight": 0.5},
+    ),
+    # flat keys = TANGIBLE leg (order display + single-leg fallback)
+    "tp_r": 1.05,
+    "mfe_trig_r": 1.00,
+    "lock_r": 0.85,
     "optimistic": False,         # pessimistic ambiguity resolution (§21)
     # ---- costs (validated) ----
     "entry_fee_bps": 7.5,
@@ -117,8 +126,8 @@ CYCLE_S = 60             # "cycle" unit counter
 BARS_LOOKBACK = {"15m": 300, "1h": 250, "4h": 90}   # boot backfill depth
 
 REASON_AR = {
-    "tp": "🎯 الهدف (1.7R)",
-    "sl_lock": "🔒 قفل ربح (1.2R)",
+    "tp": "🎯 الهدف",
+    "sl_lock": "🔒 قفل ربح",
     "sl": "🛑 وقف خسارة",
     "abort": "⚠️ إبطال مبكر (تجاوز الفجوة)",
     "time": "⏱️ إغلاق زمني (24 ساعة)",
