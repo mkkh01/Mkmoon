@@ -40,7 +40,11 @@ CREATE TABLE IF NOT EXISTS trades (
     gross_r DOUBLE PRECISION, net_r DOUBLE PRECISION, fees DOUBLE PRECISION,
     mfe_r DOUBLE PRECISION, mae_r DOUBLE PRECISION, hold_h DOUBLE PRECISION,
     ambiguous INT, locked BOOLEAN, equity_pct DOUBLE PRECISION,
-    signal_t BIGINT, ctype TEXT, session TEXT, status TEXT);
+    signal_t BIGINT, ctype TEXT, session TEXT, status TEXT,
+    leg TEXT, leg_ar TEXT, risk_pct DOUBLE PRECISION);
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS leg TEXT;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS leg_ar TEXT;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS risk_pct DOUBLE PRECISION;
 CREATE TABLE IF NOT EXISTS cycle_reports (
     id BIGSERIAL PRIMARY KEY, t BIGINT NOT NULL, cycle BIGINT, uptime_s BIGINT,
     verdict TEXT, detail TEXT);
@@ -200,9 +204,9 @@ class Store:
                 """INSERT INTO trades (trade_id,order_id,symbol,tier,side,entry_t,entry_px,
                    stop_px,locked_stop,tp_px,r,exit_t,exit_px,exit_reason,gross_r,net_r,
                    fees,mfe_r,mae_r,hold_h,ambiguous,locked,equity_pct,signal_t,ctype,
-                   session,status)
+                   session,status,leg,leg_ar,risk_pct)
                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-                           $19,$20,$21,$22,$23,$24,$25,$26,$27)
+                           $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
                    ON CONFLICT (trade_id) DO UPDATE SET
                        exit_t=EXCLUDED.exit_t, exit_px=EXCLUDED.exit_px,
                        exit_reason=EXCLUDED.exit_reason, gross_r=EXCLUDED.gross_r,
@@ -216,7 +220,8 @@ class Store:
                 r.get("exit_px"), r.get("exit_reason"), r.get("gross_R"), r.get("net_R"),
                 r.get("fees"), r.get("mfe_R"), r.get("mae_R"), r.get("hold_h"),
                 r.get("ambiguous", 0), bool(r.get("locked")), r.get("equity_pct"),
-                r.get("signal_t"), r.get("ctype"), r.get("session"), r.get("status"))
+                r.get("signal_t"), r.get("ctype"), r.get("session"), r.get("status"),
+                r.get("leg", ""), r.get("leg_ar", ""), r.get("risk_pct"))
         elif kind == "cycle":
             await self.pg.execute(
                 "INSERT INTO cycle_reports (t,cycle,uptime_s,verdict,detail) "
